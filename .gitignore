@@ -1,0 +1,7 @@
+/bin/
+/dist/
+coverage.out
+rhyolite.json
+rhyolite.log
+rhyolite.*.log
+.DS_Store
