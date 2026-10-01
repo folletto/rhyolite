@@ -324,3 +324,12 @@ The scripts in `scripts/` are the source of truth (POSIX `sh`, `set -eu`). The `
 - **Deletion** goes to the OS trash. `.trash/` in the vault is used only when the volume has no system trash. Nothing is ever deleted permanently (§5.1).
 - **Search** is case-insensitive by default, with optional regex.
 - **TLS** (self-signed) is deferred.
+
+## 12. Implementation notes (deviations from the plan above)
+
+- **Locking:** one mutex serialises all mutations (instead of per-path locks); checks and writes are atomic together. Reads are lock-free (writes are atomic renames).
+- **Absolute paths** (anything starting with `/` except `/` itself) are rejected, as planned.
+- **Search order:** results come in the same tree order as `list_recursive` (not "name matches first"), so the cursor is stable and the scan can stop early. Each hit says `match: name | content | name+content`.
+- **Trash probe:** the banner states the trash policy but does not probe the volume at startup; the fallback decision is made per delete, and each result reports `trash: "system" | "vault"`.
+- **Dependencies:** `golang.org/x/sys` is not needed (Windows uses `syscall`); Windows builds are 64-bit only (amd64/arm64) because of the `SHFILEOPSTRUCT` layout.
+- **Frontmatter** in results is omitted when the file has none; new keys written by `file_meta_write` are added in alphabetical order (existing keys keep their position).
