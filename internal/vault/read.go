@@ -20,7 +20,7 @@ const (
 // ReadResult is the outcome of Read.
 type ReadResult struct {
 	Path             string         `json:"path"`
-	Frontmatter      map[string]any `json:"frontmatter"`
+	Frontmatter      map[string]any `json:"frontmatter,omitempty"`
 	FrontmatterError string         `json:"frontmatter_error,omitempty"`
 	Content          string         `json:"content"`
 	Offset           int            `json:"offset"`
@@ -37,7 +37,7 @@ type ReadResult struct {
 // MetaResult is the outcome of MetaRead / MetaWrite.
 type MetaResult struct {
 	Path             string         `json:"path"`
-	Frontmatter      map[string]any `json:"frontmatter"`
+	Frontmatter      map[string]any `json:"frontmatter,omitempty"`
 	FrontmatterError string         `json:"frontmatter_error,omitempty"`
 	Size             int64          `json:"size"`
 	Modified         string         `json:"modified"`
