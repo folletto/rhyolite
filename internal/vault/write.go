@@ -25,7 +25,7 @@ const (
 	kindOverwrite             // whole-file replacement
 )
 
-// guard applies the staleness rules (PLAN.md §7) to a file that exists, given
+// guard applies the staleness rules to a file that exists, given
 // the hash of its current content. It returns a notice for the client, or an error.
 func (v *Vault) guard(session, rel, current, expected string, k kind) (notice string, err error) {
 	if expected != "" {

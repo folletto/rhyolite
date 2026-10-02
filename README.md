@@ -5,7 +5,7 @@ Shared access storage for data: a single-binary MCP server that exposes a folder
 ## Quick start
 
 ```sh
-scripts/build.sh              # -> bin/rhyolite
+make build                    # -> bin/rhyolite
 bin/rhyolite ~/Notes          # serve ~/Notes (default: the current folder)
 ```
 
@@ -39,20 +39,20 @@ Only `.md` files and folders. Everything else (including `rhyolite.json` and `rh
 | `folder_create` | `mkdir -p` |
 | `search` | names and/or content, case-insensitive by default, optional regex, snippets, paginated |
 
-Concurrent edits: edits match against the file's current content, and a `notice` tells a client when its copy is stale. `expected_hash` makes any edit strict. Details in [PLAN.md](PLAN.md) §7.
+Concurrent edits: edits match against the file's current content, and a `notice` tells a client when its copy is stale. `expected_hash` makes any edit strict. Details in [specs/plan-pr-1.md](specs/plan-pr-1.md) §7.
 
 Security note: the server speaks plain HTTP, so on an untrusted network the bearer token can be sniffed. TLS is not implemented yet.
 
 ## Develop
 
 ```sh
-scripts/test.sh               # gofmt, vet, cross-compile check, tests with -race
-scripts/test.sh --cover       # + coverage
-scripts/test.sh --fuzz        # + 30s fuzzing of path validation
-scripts/test.sh --real-trash  # + test that uses the real OS trash
-scripts/build.sh --all        # dist/ binaries for macOS, Linux, Windows (CGO-free)
+make build                    # -> bin/rhyolite
+make test                     # gofmt, vet, cross-compile check, tests with -race
+make cover                    # + coverage
+make fuzz                     # + 30s fuzzing of path validation
+make release                  # dist/ binaries for macOS, Linux, Windows (CGO-free)
 ```
 
-`make build`, `make test`, `make cover`, `make fuzz`, `make release` wrap the same scripts.
+`make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).
 
 Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`); the token and file contents are never logged.
