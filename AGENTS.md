@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Rhyolite: single-binary Go MCP server (HTTP, bearer token) exposing a folder of Markdown files (a "vault") to MCP clients.  one dependency (`purego`, for macOS trash); CGO-free.
+Rhyolite: single-binary Go MCP server (HTTP, bearer token) exposing a folder of Markdown files (a "vault") to MCP clients. One dependency (`purego`, for macOS trash); CGO-free.
 
 ## Commands
 
