@@ -22,7 +22,17 @@ make release   # dist/ for macOS/Linux/Windows
 - `internal/vault/`: all file operations, confined to the vault root via `os.Root`; paths, frontmatter, search, move, staleness tracker, pagination cursors.
 - `internal/trash/`: OS trash per platform (macOS, freedesktop, Windows).
 - `internal/logfile/`: monthly-rolling `rhyolite.log`.
-- `specs/`: plans, one per PR, named `plan-pr-<N>.md` (N = the PR number). Each PR has its own plan; create it if missing. `specs/plan-pr-1.md` is the original design: read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations) before changing behaviour.
+- `specs/`: plans, one per PR, named `plan-pr-<N>.md` (N = the PR number). Each PR has its own plan; create it if missing (see "Plan → PR workflow"). `specs/plan-pr-1.md` is the original design: read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations) before changing behaviour.
+
+## Plan → PR workflow
+
+The PR number isn't known until the PR exists, so once a plan is ready:
+
+1. Write the plan under a temporary name (e.g. `specs/plan-<topic>.md`), commit it alone on a new branch, push, and open the PR.
+2. Rename the file to `specs/plan-pr-<N>.md` using the new PR number, and remove any placeholder notes about renaming.
+3. Rewrite the branch so its first and only commit is the plan with its final name (`git commit --amend`), then `git push --force-with-lease`. The PR then starts with a single plan commit.
+
+Implementation commits go on top of that first commit.
 
 ## Invariants (don't break)
 
