@@ -60,9 +60,9 @@ app:
 ### 3.2 `scripts/build.sh --app` steps
 
 1. Require macOS (`uname -s` = `Darwin`) and `swift`. Otherwise exit with a clear message.
-2. Build a **universal** CLI: `go build` for `darwin/arm64` and `darwin/amd64` with the existing `LDFLAGS`/`VERSION`, then `lipo -create` into a temp dir.
+2. Build a **universal** CLI: `go build` for `darwin/arm64` and `darwin/amd64` with the existing `LDFLAGS`/`VERSION`, then `lipo -create` into `macos/.build/`.
 3. Build the app executable: `swift build -c release --package-path macos --arch arm64 --arch x86_64`. The binary path comes from `--show-bin-path`.
-4. Assemble `bin/Rhyolite.app`:
+4. Assemble the bundle in the staging folder `macos/.build/Rhyolite.app`, never directly in `bin/`:
    ```
    Rhyolite.app/Contents/
      Info.plist                (copied, with CFBundleShortVersionString / CFBundleVersion set from $VERSION via plutil)
@@ -72,9 +72,20 @@ app:
    ```
    The CLI goes in `Contents/Helpers/`, **not** `Contents/MacOS/`. The default macOS filesystem is case-insensitive, so `MacOS/rhyolite` and `MacOS/Rhyolite` would be the same file.
 5. Sign inside-out with an ad-hoc identity (`codesign --force --options runtime --timestamp=none -s -`): first `Helpers/rhyolite`, then the bundle. `SIGN_IDENTITY` can override `-`, so a Developer ID can be used later without changing the script.
-6. Print `built bin/Rhyolite.app (<version>)`, matching the existing output style.
+6. **Last step, only after everything above has succeeded:** move the finished bundle into `bin/` next to the CLI. Remove any old `bin/Rhyolite.app`, then `mv macos/.build/Rhyolite.app bin/Rhyolite.app`. Only the packaged app goes to `bin/`. Intermediate files (Swift build products, the universal CLI) stay in `macos/.build/`.
+7. Print `built bin/Rhyolite.app (<version>)`, matching the existing output style.
 
-The script stays POSIX `sh`, like the rest of `scripts/`.
+The script stays POSIX `sh` with `set -eu`, like the rest of `scripts/`. Because of `set -eu`, a failed step exits before step 6. A broken build therefore never replaces a working `bin/Rhyolite.app`, and `bin/` never holds a half-assembled bundle.
+
+`bin/` ends up with both build outputs side by side:
+
+```
+bin/
+  rhyolite          make build
+  Rhyolite.app      make app
+```
+
+These two names don't collide on a case-insensitive filesystem, because `Rhyolite.app` and `rhyolite` differ by more than case.
 
 ### 3.3 Deployment target
 
