@@ -1,17 +1,18 @@
 # AGENTS.md
 
-Rhyolite: single-binary Go MCP server (HTTP, bearer token) exposing a folder of Markdown files (a "vault") to MCP clients. Module `github.com/folletto/rhyolite`; one dependency (`purego`, for macOS trash); CGO-free.
+Rhyolite: single-binary Go MCP server (HTTP, bearer token) exposing a folder of Markdown files (a "vault") to MCP clients.  one dependency (`purego`, for macOS trash); CGO-free.
 
 ## Commands
 
 ```sh
-scripts/build.sh          # -> bin/rhyolite (--all: dist/ for macOS/Linux/Windows)
-scripts/test.sh           # gofmt + vet + cross-compile + tests with -race (run before committing)
-scripts/test.sh --fuzz    # also fuzz path validation (30s)
-scripts/test.sh --real-trash   # also hits the real OS trash
+make build     # -> bin/rhyolite
+make test      # gofmt + vet + cross-compile + tests with -race (run before committing)
+make cover     # + coverage
+make fuzz      # + 30s fuzzing of path validation
+make release   # dist/ for macOS/Linux/Windows
 ```
 
-`make build|test|cover|fuzz|release` wrap these. Run locally: `bin/rhyolite <folder> [--port N]`.
+`make` wraps `scripts/build.sh` and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N]`.
 
 ## Layout
 
@@ -21,7 +22,7 @@ scripts/test.sh --real-trash   # also hits the real OS trash
 - `internal/vault/`: all file operations, confined to the vault root via `os.Root`; paths, frontmatter, search, move, staleness tracker, pagination cursors.
 - `internal/trash/`: OS trash per platform (macOS, freedesktop, Windows).
 - `internal/logfile/`: monthly-rolling `rhyolite.log`.
-- `PLAN.md`: design spec and decisions log. Read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations from plan) before changing behaviour.
+- `specs/`: plans, one per PR, named `plan-pr-<N>.md` (N = the PR number). Each PR has its own plan; create it if missing. `specs/plan-pr-1.md` is the original design: read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations) before changing behaviour.
 
 ## Invariants (don't break)
 
@@ -35,5 +36,5 @@ scripts/test.sh --real-trash   # also hits the real OS trash
 
 - Code must stay `gofmt`/`go vet` clean and pass cross-compilation for all three OSes (platform code uses build-tagged files, e.g. `system_darwin.go`).
 - Add tests alongside changes (`*_test.go`, integration tests in `internal/server`). Keep the fuzz test for path validation passing.
-- Update `README.md` (user-facing) and `PLAN.md` (design) when behaviour changes.
+- Update `README.md` (user-facing) and the PR's plan in `specs/` when behaviour changes.
 - Not implemented yet: TLS (plain HTTP only).

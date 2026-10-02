@@ -2,7 +2,7 @@ package vault
 
 import "testing"
 
-// One test per row of the table in PLAN.md §7.
+// One test per row of the table in specs/plan-pr-1.md §7.
 
 func TestStaleEditOnUnreadFileIsAllowed(t *testing.T) {
 	v, dir, _ := newVault(t)
