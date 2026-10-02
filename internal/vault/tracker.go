@@ -6,7 +6,7 @@ import (
 )
 
 // What a session last saw of a file. Advisory: used to warn about stale
-// views (see specs/plan-pr-1.md §7), never to block a patch.
+// views, never to block a patch.
 type seen struct {
 	hash    string
 	partial bool

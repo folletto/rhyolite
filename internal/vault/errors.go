@@ -23,7 +23,7 @@ func display(rel string) string {
 	return rel
 }
 
-// Messages returned for the stale-file rules (see specs/plan-pr-1.md §7).
+// Messages returned for the stale-file rules.
 var (
 	errModified = &Error{"File has been modified since it was read. Read it again before writing to it."}
 	errPartial  = &Error{"File was only partially read. Read the full file before overwriting it."}
