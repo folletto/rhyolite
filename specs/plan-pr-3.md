@@ -224,3 +224,12 @@ The window size and position are remembered with `setFrameAutosaveName`.
 4. Safe quit + orphan cleanup.
 5. Tests, `test.sh` wiring, `.gitignore`, `clean`, `release` zip.
 6. README / AGENTS.
+
+## 10. Deviations from this plan (as built)
+
+- **Two Swift targets instead of one.** `RhyoliteCore` (library: `Settings`, `LineSplitter`/`LogBuffer`, `ServerProcess`, `OrphanReaper`, `launchAction`) and `Rhyolite` (executable: AppKit/SwiftUI shell). Tests import the library, and the executable's `main.swift` can't be tested directly. The `macos/Sources/Rhyolite/` file list in §2 is now `AppModel`, `AppDelegate`, `MainWindowController`, `MainView` (with `LogTextView`), `main.swift`. `SettingsTests`, `LogBufferTests` and `ServerProcessTests` (which also covers `OrphanReaper`) are in `macos/Tests/RhyoliteTests/`.
+- **A server that fails while the window is hidden opens the window**, not only a failed auto-start. The auto-start case is the same code path.
+- **`RHYOLITE_CLI` env var** overrides the embedded CLI path, for running the bare executable during development.
+- **Output is read with POSIX `read` on a thread per pipe.** `FileHandle.read(upToCount:)` waits to fill its buffer on a pipe, so output only appeared when the process ended.
+- **The release zip is built with `ditto --norsrc --noextattr --noqtn`** so it holds no `._` metadata entries.
+- **Not verified:** closing the window with the close button (macOS refused to let the test harness send keystrokes). The behaviour follows from `applicationShouldTerminateAfterLastWindowClosed` returning false and the window being kept alive on close. A visual check of the window is also still pending, because screenshots weren't permitted either.

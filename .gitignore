@@ -1,5 +1,6 @@
 /bin/
 /dist/
+/macos/.build/
 coverage.out
 rhyolite.json
 rhyolite.log

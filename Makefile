@@ -1,7 +1,10 @@
-.PHONY: build release test cover fuzz clean
+.PHONY: build app release test cover fuzz clean
 
 build:
 	@scripts/build.sh
+
+app:
+	@scripts/build.sh --app
 
 release:
 	@scripts/build.sh --all
@@ -16,4 +19,4 @@ fuzz:
 	@scripts/test.sh --fuzz
 
 clean:
-	rm -rf bin dist coverage.out
+	rm -rf bin dist coverage.out macos/.build
