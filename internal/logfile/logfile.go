@@ -3,6 +3,7 @@ package logfile
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,7 +18,8 @@ type Writer struct {
 	dir   string
 	now   func() time.Time
 	f     *os.File
-	month string // yyyymm of the open file
+	month string    // yyyymm of the open file
+	echo  io.Writer // optional copy of every line, e.g. the terminal
 }
 
 // New opens (or creates) the log in dir.
@@ -85,6 +87,14 @@ func appendFile(dst, src string) error {
 	return err
 }
 
+// SetEcho makes the Writer also write every line to out, identical to what
+// goes to the file. Pass nil to stop echoing.
+func (w *Writer) SetEcho(out io.Writer) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.echo = out
+}
+
 // Printf writes one timestamped line.
 func (w *Writer) Printf(format string, args ...any) {
 	w.mu.Lock()
@@ -92,7 +102,11 @@ func (w *Writer) Printf(format string, args ...any) {
 	if err := w.rotateIfNeeded(); err != nil {
 		return
 	}
-	fmt.Fprintf(w.f, "%s %s\n", w.now().Format("2006-01-02T15:04:05Z07:00"), fmt.Sprintf(format, args...))
+	line := fmt.Sprintf("%s %s\n", w.now().Format("2006-01-02T15:04:05Z07:00"), fmt.Sprintf(format, args...))
+	io.WriteString(w.f, line)
+	if w.echo != nil {
+		io.WriteString(w.echo, line)
+	}
 }
 
 // Write lets the Writer be used as an io.Writer (e.g. by net/http error logs).
@@ -102,7 +116,11 @@ func (w *Writer) Write(p []byte) (int, error) {
 	if err := w.rotateIfNeeded(); err != nil {
 		return 0, err
 	}
-	return w.f.Write(p)
+	n, err := w.f.Write(p)
+	if w.echo != nil {
+		w.echo.Write(p[:n])
+	}
+	return n, err
 }
 
 // Close closes the file.

@@ -55,4 +55,4 @@ make release                  # dist/ binaries for macOS, Linux, Windows (CGO-fr
 
 `make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).
 
-Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`); the token and file contents are never logged.
+Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`) and every line is also printed to the terminal; the token and file contents are never logged.

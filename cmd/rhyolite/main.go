@@ -110,6 +110,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	}
 
 	printBanner(stdout, dir, cfg, actual)
+	logw.SetEcho(stdout)
 	logw.Printf("start rhyolite %s vault=%s listen=%s", version, filepath.Base(dir), ln.Addr())
 
 	errc := make(chan error, 1)

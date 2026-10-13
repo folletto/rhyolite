@@ -88,3 +88,22 @@ func TestExistingArchiveIsNotClobbered(t *testing.T) {
 		t.Errorf("archive = %q", got)
 	}
 }
+
+func TestEchoMatchesFile(t *testing.T) {
+	dir := t.TempDir()
+	c := &clock{time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)}
+	w, err := newWithClock(dir, c.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var echo strings.Builder
+	w.SetEcho(&echo)
+	w.Printf("hello %d", 1)
+	w.Write([]byte("raw line\n"))
+	w.Close()
+
+	got := read(t, filepath.Join(dir, "rhyolite.log"))
+	if got != echo.String() || !strings.Contains(got, "hello 1\n") || !strings.Contains(got, "raw line\n") {
+		t.Errorf("file = %q, echo = %q", got, echo.String())
+	}
+}

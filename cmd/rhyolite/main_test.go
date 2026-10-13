@@ -159,6 +159,17 @@ func TestStartupCreatesConfigServesAndStops(t *testing.T) {
 	if !strings.Contains(string(logb), "start rhyolite") || !strings.Contains(string(logb), "tool file_write") || strings.Contains(string(logb), cfg.Token) {
 		t.Errorf("log:\n%s", logb)
 	}
+	// Every log line is echoed to the terminal after the banner, unchanged.
+	term := out.String()
+	if !strings.Contains(term, "Press Ctrl+C") {
+		t.Fatalf("no banner:\n%s", term)
+	}
+	echoed := term[strings.Index(term, "Press Ctrl+C"):]
+	for _, line := range strings.Split(strings.TrimSpace(string(logb)), "\n") {
+		if !strings.Contains(echoed, line+"\n") {
+			t.Errorf("log line not on terminal: %q", line)
+		}
+	}
 }
 
 func hostOf(url string) string {
