@@ -14,6 +14,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/folletto/rhyolite/internal/logfile"
 	"github.com/folletto/rhyolite/internal/trash"
 	"github.com/folletto/rhyolite/internal/vault"
 )
@@ -25,10 +26,10 @@ type memLog struct {
 	lines []string
 }
 
-func (m *memLog) Printf(f string, a ...any) {
+func (m *memLog) Log(event string, kv ...any) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.lines = append(m.lines, strings.TrimSpace(sprintf(f, a...)))
+	m.lines = append(m.lines, logfile.Format(time.Unix(0, 0).UTC(), event, kv...))
 }
 
 func (m *memLog) text() string {
@@ -339,7 +340,7 @@ func TestAuthentication(t *testing.T) {
 			t.Errorf("%s: status %d, want %d", c.name, got, c.want)
 		}
 	}
-	if !strings.Contains(e.log.text(), "auth failure") {
+	if !strings.Contains(e.log.text(), "event=auth_fail method=") {
 		t.Error("auth failures not logged")
 	}
 	if strings.Contains(e.log.text(), testToken) {
@@ -404,7 +405,7 @@ func TestToolCallsAreLoggedWithoutContent(t *testing.T) {
 	ok(t, cs, "file_write", map[string]any{"path": "secret.md", "content": "TOP-SECRET-CONTENT"})
 	call(t, cs, "file_read", map[string]any{"path": "nope.md"})
 	log := e.log.text()
-	if !strings.Contains(log, `tool file_write path="secret.md" -> ok`) || !strings.Contains(log, `tool file_read path="nope.md" -> error: not found`) {
+	if !strings.Contains(log, "event=tool name=file_write path=secret.md result=ok dur_ms=") || !strings.Contains(log, "event=tool name=file_read path=nope.md result=error dur_ms=") || !strings.Contains(log, " error=") {
 		t.Errorf("log:\n%s", log)
 	}
 	if strings.Contains(log, "TOP-SECRET-CONTENT") || strings.Contains(log, testToken) {

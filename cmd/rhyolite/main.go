@@ -34,7 +34,7 @@ func main() {
 	}
 }
 
-const usage = `Usage: rhyolite [--port N] [folder]
+const usage = `Usage: rhyolite [--port N] [--verbosity none|basic|verbose] [folder]
 
 Serves the markdown .md files in folder (default: the current folder) as an MCP
 server over HTTP. No file outside the folder is ever accessed.
@@ -46,6 +46,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs.Usage = func() { fmt.Fprint(stderr, usage); fs.PrintDefaults() }
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	port := fs.Int("port", -1, "listen port, overriding rhyolite.json (0 picks a free port)")
+	verbosity := fs.String("verbosity", "verbose", "terminal output: none, basic (setup info only) or verbose (setup info and log lines)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -55,6 +56,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if *showVersion {
 		fmt.Fprintln(stdout, "rhyolite", version)
 		return nil
+	}
+	switch *verbosity {
+	case "none":
+		stdout = io.Discard
+	case "basic", "verbose":
+	default:
+		return fmt.Errorf("invalid --verbosity %q: use none, basic or verbose", *verbosity)
 	}
 	if fs.NArg() > 1 {
 		return errors.New("at most one folder argument is accepted")
@@ -110,7 +118,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	}
 
 	printBanner(stdout, cfg, actual)
-	logw.Printf("start rhyolite %s vault=%s listen=%s", version, filepath.Base(dir), ln.Addr())
+	if *verbosity == "verbose" {
+		logw.SetEcho(stdout, "client_new")
+	}
+	logw.Log("start", "version", version, "vault", filepath.Base(dir), "listen", ln.Addr())
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
@@ -123,6 +134,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = srv.Shutdown(sctx)
-	logw.Printf("stop")
+	logw.Log("stop")
 	return err
 }

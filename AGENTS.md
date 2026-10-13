@@ -13,7 +13,7 @@ make app       # -> bin/Rhyolite.app (macOS only; needs the Swift toolchain)
 make release   # dist/ for macOS/Linux/Windows (+ Rhyolite-macos.zip on macOS)
 ```
 
-`make` wraps `scripts/build.sh` and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N]`.
+`make` wraps `scripts/build.sh` and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N] [--verbosity none|basic|verbose]`.
 
 ## Layout
 
@@ -50,6 +50,6 @@ Implementation commits go on top of that first commit.
 - Add tests alongside changes (`*_test.go`, integration tests in `internal/server`). Keep the fuzz test for path validation passing.
 - Go files must not reference plan files (`specs/`); keep comments self-contained.
 - Update `README.md` (user-facing) when behaviour changes, and the PR's plan in `specs/` if it has one.
-- The macOS app only wraps the CLI: it starts and stops it and shows its output. Never move server logic into Swift, and keep the CLI's stdout/stderr and SIGINT/SIGTERM behaviour stable, because the app relies on them (`● Listening` marks a successful start).
+- The macOS app only wraps the CLI: it starts and stops it and shows its output. Never move server logic into Swift, and keep the CLI's stdout/stderr and SIGINT/SIGTERM behaviour stable, because the app relies on them (`● Listening` marks a successful start). The app runs the CLI at the default `--verbosity verbose`, so its output view shows the setup lines plus the logfmt `event=` log lines; never make it pass `--verbosity none`, which suppresses `● Listening` so a start is never detected (`basic` is safe).
 - Swift builds only on macOS. Run swift commands outside restrictive sandboxes (they write to system caches).
 - Not implemented yet: TLS (plain HTTP only).
