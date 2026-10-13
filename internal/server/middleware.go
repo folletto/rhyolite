@@ -7,32 +7,67 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Logger is what the server needs from a log: rhyolite.log in production.
+// kv alternates string keys and values.
 type Logger interface {
-	Printf(format string, args ...any)
+	Log(event string, kv ...any)
 }
 
 type nopLogger struct{}
 
-func (nopLogger) Printf(string, ...any) {}
+func (nopLogger) Log(string, ...any) {}
 
 // bearerAuth rejects requests without the right "Authorization: Bearer" token.
-func bearerAuth(token string, log Logger, next http.Handler) http.Handler {
+func bearerAuth(token string, log Logger, clients *clientTracker, next http.Handler) http.Handler {
 	want := sha256.Sum256([]byte(token))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		sum := sha256.Sum256([]byte(got))
-		if !ok || subtle.ConstantTimeCompare(sum[:], want[:]) != 1 {
-			log.Printf("auth failure from %s: %s %s", clientIP(r), r.Method, r.URL.Path)
+		valid := ok && subtle.ConstantTimeCompare(sum[:], want[:]) == 1
+		if clients.isNew(clientIP(r)) {
+			auth := "fail"
+			if valid {
+				auth = "ok"
+			}
+			log.Log("client_new", "ip", clientIP(r), "auth", auth)
+		}
+		if !valid {
+			log.Log("auth_fail", "method", r.Method, "path", r.URL.Path, "ip", clientIP(r))
 			w.Header().Set("WWW-Authenticate", `Bearer realm="rhyolite"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// maxClients bounds the set of remembered client IPs so scanners cannot grow
+// it without limit; once full, no further IPs are recorded or announced.
+const maxClients = 10000
+
+// clientTracker remembers the client IPs seen since the server started (it
+// is in memory only, so a restart announces every client again).
+type clientTracker struct {
+	mu   sync.Mutex
+	seen map[string]struct{}
+}
+
+// isNew reports whether ip is seen for the first time, and records it.
+func (c *clientTracker) isNew(ip string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.seen[ip]; ok || len(c.seen) >= maxClients {
+		return false
+	}
+	if c.seen == nil {
+		c.seen = map[string]struct{}{}
+	}
+	c.seen[ip] = struct{}{}
+	return true
 }
 
 // originGuard blocks browser requests from web pages: a request carrying an
@@ -92,7 +127,7 @@ func requestLog(log Logger, next http.Handler) http.Handler {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: 200}
 		next.ServeHTTP(sw, r)
-		log.Printf("http %s %s -> %d (%s) from %s", r.Method, r.URL.Path, sw.status, time.Since(start).Round(time.Millisecond), clientIP(r))
+		log.Log("http", "method", r.Method, "path", r.URL.Path, "status", sw.status, "dur_ms", time.Since(start), "ip", clientIP(r))
 	})
 }
 

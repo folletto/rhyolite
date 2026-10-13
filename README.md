@@ -19,7 +19,7 @@ On start it creates (or reads) `rhyolite.json` in the folder, holding the access
 
 Two flavours are printed: one using [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) for clients that insist on HTTPS, and one for clients that speak HTTP directly (e.g. `claude mcp add --transport http`).
 
-Options: `--port N` overrides the port from `rhyolite.json` (default `6270`), `--version` prints the version.
+Options: `--port N` overrides the port from `rhyolite.json` (default `6270`), `--verbosity none|basic|verbose` sets the terminal output (default `verbose`): `none` prints nothing, `basic` prints only the setup info (configuration and startup banner), `verbose` also echoes every log line. `rhyolite.log` is written in all modes. `--version` prints the version.
 
 To rotate the token, empty the `"token"` field in `rhyolite.json` and restart.
 
@@ -72,4 +72,23 @@ make release                  # dist/ binaries for macOS, Linux, Windows (CGO-fr
 
 `make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).
 
-Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`); the token and file contents are never logged.
+Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`) and every line is also printed to the terminal; the token and file contents are never logged.
+
+Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space-separated `key=value` pairs in a fixed order, always starting with `ts=<RFC3339> event=<name>`. A value that is empty or contains a space, `=`, `"` or a control character is double-quoted (Go string syntax, so `\"` and `\n` escapes); everything else is bare.
+
+| `event` | Keys after `ts` and `event` |
+| --- | --- |
+| `start` | `version`, `vault`, `listen` |
+| `stop` | none |
+| `http` | `method`, `path`, `status`, `dur_ms`, `ip` |
+| `client_new` | `ip`, `auth` (`ok` or `fail`: whether that first request had a valid token) |
+| `auth_fail` | `method`, `path`, `ip` |
+| `tool` | `name`, `path` (when the tool takes one), `destination` (moves), `result` (`ok` or `error`), `dur_ms`, and `error` (only on failure; truncated to 200 characters) |
+
+`client_new` is logged once, just before the first `http`/`auth_fail` line from a client IP not seen since the server started (the set is kept in memory, so a restart announces everyone again, and it stops growing at 10,000 IPs). In a terminal that line is printed in bold; the log file never contains escape codes.
+
+```
+ts=2026-09-30T12:00:00+02:00 event=client_new ip=192.168.1.20 auth=ok
+ts=2026-09-30T12:00:00+02:00 event=http method=POST path=/mcp status=200 dur_ms=12 ip=192.168.1.20
+ts=2026-09-30T12:00:00+02:00 event=tool name=file_read path="my notes/a.md" result=ok dur_ms=1
+```

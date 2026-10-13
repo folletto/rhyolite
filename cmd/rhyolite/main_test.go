@@ -156,8 +156,19 @@ func TestStartupCreatesConfigServesAndStops(t *testing.T) {
 		t.Errorf("shutdown: %v", err)
 	}
 	logb, _ := os.ReadFile(filepath.Join(dir, "rhyolite.log"))
-	if !strings.Contains(string(logb), "start rhyolite") || !strings.Contains(string(logb), "tool file_write") || strings.Contains(string(logb), cfg.Token) {
+	if !strings.Contains(string(logb), "event=start version=") || !strings.Contains(string(logb), "event=tool name=file_write path=hello.md result=ok") || strings.Contains(string(logb), cfg.Token) {
 		t.Errorf("log:\n%s", logb)
+	}
+	// Every log line is echoed to the terminal after the banner, unchanged.
+	term := out.String()
+	if !strings.Contains(term, "Press Ctrl+C") {
+		t.Fatalf("no banner:\n%s", term)
+	}
+	echoed := term[strings.Index(term, "Press Ctrl+C"):]
+	for _, line := range strings.Split(strings.TrimSpace(string(logb)), "\n") {
+		if !strings.Contains(echoed, line+"\n") {
+			t.Errorf("log line not on terminal: %q", line)
+		}
 	}
 }
 
@@ -232,5 +243,55 @@ func TestPortInUseIsAnError(t *testing.T) {
 	var o2, e2 bytes.Buffer
 	if err := run(context.Background(), []string{"--port", m[1], t.TempDir()}, &o2, &e2); err == nil {
 		t.Error("second server on the same port started")
+	}
+}
+
+func TestVerbosityLevels(t *testing.T) {
+	for _, c := range []struct {
+		level          string
+		banner, events bool
+	}{{"none", false, false}, {"basic", true, false}, {"verbose", true, true}} {
+		t.Run(c.level, func(t *testing.T) {
+			dir := t.TempDir()
+			out := &syncBuf{}
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan error, 1)
+			go func() { done <- run(ctx, []string{"--port", "0", "--verbosity", c.level, dir}, out, out) }()
+			logPath := filepath.Join(dir, "rhyolite.log")
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				if b, _ := os.ReadFile(logPath); strings.Contains(string(b), "event=start") {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("server did not start")
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			cancel()
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			got := out.String()
+			if c.level == "none" && got != "" {
+				t.Errorf("stdout not empty: %q", got)
+			}
+			if has := strings.Contains(got, "Press Ctrl+C"); has != c.banner {
+				t.Errorf("banner present = %v", has)
+			}
+			if has := strings.Contains(got, "event="); has != c.events {
+				t.Errorf("log lines present = %v:\n%s", has, got)
+			}
+			if b, _ := os.ReadFile(logPath); !strings.Contains(string(b), "event=stop") {
+				t.Errorf("log file incomplete:\n%s", b)
+			}
+		})
+	}
+}
+
+func TestInvalidVerbosity(t *testing.T) {
+	err := run(context.Background(), []string{"--verbosity", "loud", t.TempDir()}, &syncBuf{}, &syncBuf{})
+	if err == nil || !strings.Contains(err.Error(), "none, basic or verbose") {
+		t.Errorf("err = %v", err)
 	}
 }
