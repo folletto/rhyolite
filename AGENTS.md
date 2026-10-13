@@ -46,6 +46,7 @@ Implementation commits go on top of that first commit.
 
 ## Conventions
 
+- Before starting work on a new branch, fetch `origin` and make sure the branch starts from the latest `main`; update it first if it doesn't.
 - Code must stay `gofmt`/`go vet` clean and pass cross-compilation for all three OSes (platform code uses build-tagged files, e.g. `system_darwin.go`).
 - Add tests alongside changes (`*_test.go`, integration tests in `internal/server`). Keep the fuzz test for path validation passing.
 - Go files must not reference plan files (`specs/`); keep comments self-contained.
