@@ -43,14 +43,31 @@ Concurrent edits: edits match against the file's current content, and a `notice`
 
 Security note: the server speaks plain HTTP, so on an untrusted network the bearer token can be sniffed. TLS is not implemented yet.
 
+## macOS app
+
+`Rhyolite.app` is a native wrapper around the CLI for people who'd rather not use a terminal. It embeds `rhyolite` and runs it; the server itself is unchanged.
+
+```sh
+make app                      # -> bin/Rhyolite.app (macOS 14+, needs Xcode or the Command Line Tools)
+open bin/Rhyolite.app
+```
+
+- **First launch** opens a window where you choose the vault folder.
+- **Later launches** open no window and start the server on the saved folder. If the folder is gone, or the server fails to start (for example, the port is taken), the window opens instead.
+- The window has a **Start / Stop** button (Start is disabled until the folder exists) and a live log of the CLI's output, including the `mcp.json` snippets with your token. The log is kept in memory only.
+- Closing the window keeps the app and server running. Click the Dock icon to reopen it. **Quit** (menu or ⌘Q) stops the server first: it sends the CLI the same signal as Ctrl+C and only forces it after a timeout.
+
+The build is ad-hoc signed, which is enough on the Mac that built it. An app downloaded from elsewhere is quarantined by Gatekeeper: right-click → Open, or run `xattr -dr com.apple.quarantine Rhyolite.app`. Developer ID signing and notarization aren't set up yet (`SIGN_IDENTITY` in `scripts/build.sh` is the hook for it).
+
 ## Develop
 
 ```sh
 make build                    # -> bin/rhyolite
-make test                     # gofmt, vet, cross-compile check, tests with -race
+make test                     # gofmt, vet, cross-compile check, tests with -race (+ the app's Swift tests on macOS)
 make cover                    # + coverage
 make fuzz                     # + 30s fuzzing of path validation
-make release                  # dist/ binaries for macOS, Linux, Windows (CGO-free)
+make app                      # bin/Rhyolite.app (macOS only)
+make release                  # dist/ binaries for macOS, Linux, Windows (CGO-free), plus Rhyolite-macos.zip on macOS
 ```
 
 `make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).

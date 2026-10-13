@@ -6,10 +6,11 @@ Rhyolite: single-binary Go MCP server (HTTP, bearer token) exposing a folder of 
 
 ```sh
 make build     # -> bin/rhyolite
-make test      # gofmt + vet + cross-compile + tests with -race (run before committing)
+make test      # gofmt + vet + cross-compile + tests with -race, + `swift test` on macOS (run before committing)
 make cover     # + coverage
 make fuzz      # + 30s fuzzing of path validation
-make release   # dist/ for macOS/Linux/Windows
+make app       # -> bin/Rhyolite.app (macOS only; needs the Swift toolchain)
+make release   # dist/ for macOS/Linux/Windows (+ Rhyolite-macos.zip on macOS)
 ```
 
 `make` wraps `scripts/build.sh` and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N]`.
@@ -22,7 +23,18 @@ make release   # dist/ for macOS/Linux/Windows
 - `internal/vault/`: all file operations, confined to the vault root via `os.Root`; paths, frontmatter, search, move, staleness tracker, pagination cursors.
 - `internal/trash/`: OS trash per platform (macOS, freedesktop, Windows).
 - `internal/logfile/`: monthly-rolling `rhyolite.log`.
-- `specs/`: plans, one per PR, named `plan-pr-<N>.md` (N = the PR number). Each PR has its own plan; create it if missing. `specs/plan-pr-1.md` is the original design: read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations) before changing behaviour.
+- `macos/`: the native Swift app (SwiftPM, no Xcode project). `RhyoliteCore` holds settings, the log buffer and the child-process wrapper (unit-tested); `Rhyolite` is the AppKit/SwiftUI shell. The CLI is embedded in the bundle at `Contents/Helpers/rhyolite`.
+- `specs/`: plans, one per PR, named `plan-pr-<N>.md` (N = the PR number). Each PR has its own plan; create it if missing (see "Plan → PR workflow"). `specs/plan-pr-1.md` is the original design: read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations) before changing behaviour.
+
+## Plan → PR workflow
+
+The PR number isn't known until the PR exists, so once a plan is ready:
+
+1. Write the plan under a temporary name (e.g. `specs/plan-<topic>.md`), commit it alone on a new branch, push, and open the PR.
+2. Rename the file to `specs/plan-pr-<N>.md` using the new PR number, and remove any placeholder notes about renaming.
+3. Rewrite the branch so its first and only commit is the plan with its final name (`git commit --amend`), then `git push --force-with-lease`. The PR then starts with a single plan commit.
+
+Implementation commits go on top of that first commit.
 
 ## Invariants (don't break)
 
@@ -38,4 +50,6 @@ make release   # dist/ for macOS/Linux/Windows
 - Add tests alongside changes (`*_test.go`, integration tests in `internal/server`). Keep the fuzz test for path validation passing.
 - Go files must not reference plan files (`specs/`); keep comments self-contained.
 - Update `README.md` (user-facing) and the PR's plan in `specs/` when behaviour changes.
+- The macOS app only wraps the CLI: it starts and stops it and shows its output. Never move server logic into Swift, and keep the CLI's stdout/stderr and SIGINT/SIGTERM behaviour stable, because the app relies on them (`▴ Listening on` marks a successful start).
+- Swift builds only on macOS. Run swift commands outside restrictive sandboxes (they write to system caches).
 - Not implemented yet: TLS (plain HTTP only).
