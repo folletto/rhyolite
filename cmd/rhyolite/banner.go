@@ -68,24 +68,23 @@ func nativeConfig(url, token string) any {
 	}}}
 }
 
-func printBanner(w io.Writer, dir string, cfg *config.Config, port int) {
+func printBanner(w io.Writer, cfg *config.Config, port int) {
 	hosts := hostsFor(cfg.Host)
 	url := func(h string) string { return "http://" + net.JoinHostPort(h, strconv.Itoa(port)) + "/mcp" }
 
-	fmt.Fprintf(w, "▴ Vault: %s\n", dir)
-	fmt.Fprintf(w, "▴ Listening on %s\n", url(hosts[0]))
-	for _, h := range hosts[1:] {
-		fmt.Fprintf(w, "           also %s\n", url(h))
-	}
-	fmt.Fprintln(w, "▴ Deletes go to the system trash (.trash/ in the vault if the volume has none)")
-	fmt.Fprintln(w, "▴ Log: rhyolite.log")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "▴ mcp.json (via mcp-remote, for clients that require HTTPS):")
+	fmt.Fprintln(w, "● Listening")
+	for _, h := range hosts {
+		fmt.Fprintf(w, "  on: %s\n", url(h))
+	}
+	fmt.Fprintln(w, "› Log: rhyolite.log")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "■ Config")
+	fmt.Fprintln(w, "  mcp.json (if client requires https):")
 	fmt.Fprintln(w, pretty(mcpRemoteConfig(url(hosts[0]), cfg.Token)))
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "▴ mcp.json (clients with native HTTP support, e.g. Claude Code):")
+	fmt.Fprintln(w, "  mcp.json (if client supports http):")
 	fmt.Fprintln(w, pretty(nativeConfig(url(hosts[0]), cfg.Token)))
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "▴ Plain HTTP: the token is visible to anyone who can sniff this network.")
-	fmt.Fprintln(w, "▴ Press Ctrl+C to stop")
+	fmt.Fprintln(w, "∙ Press Ctrl+C to stop")
 }

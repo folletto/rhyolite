@@ -29,14 +29,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "rhyolite:", err)
+		fmt.Fprintln(os.Stderr, "‼ rhyolite:", err)
 		os.Exit(1)
 	}
 }
 
 const usage = `Usage: rhyolite [--port N] [--verbosity none|basic|verbose] [folder]
 
-Serves the Markdown files in folder (default: the current folder) as an MCP
+Serves the markdown .md files in folder (default: the current folder) as an MCP
 server over HTTP. No file outside the folder is ever accessed.
 `
 
@@ -78,15 +78,15 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return fmt.Errorf("%s is not a folder", folder)
 	}
+	fmt.Fprintln(stdout, "▲ Rhyolite")
+	fmt.Fprintf(stdout, "  vault: %s\n", dir)
 
 	cfg, status, err := config.Load(dir)
 	if err != nil {
 		return err
 	}
 	if status == config.Created {
-		fmt.Fprintln(stdout, "▴ Creating rhyolite.json")
-	} else {
-		fmt.Fprintln(stdout, "▴ Reading rhyolite.json")
+		fmt.Fprintln(stdout, "› Creating: rhyolite.json")
 	}
 	if *port >= 0 {
 		cfg.Port = *port
@@ -117,7 +117,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		ErrorLog:          nil,
 	}
 
-	printBanner(stdout, dir, cfg, actual)
+	printBanner(stdout, cfg, actual)
 	if *verbosity == "verbose" {
 		logw.SetEcho(stdout, "client_new")
 	}
@@ -130,7 +130,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return err
 	case <-ctx.Done():
 	}
-	fmt.Fprintln(stdout, "\n▴ Stopping")
+	fmt.Fprintln(stdout, "\n■ Stopping")
 	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = srv.Shutdown(sctx)
