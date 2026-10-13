@@ -19,7 +19,7 @@ On start it creates (or reads) `rhyolite.json` in the folder, holding the access
 
 Two flavours are printed: one using [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) for clients that insist on HTTPS, and one for clients that speak HTTP directly (e.g. `claude mcp add --transport http`).
 
-Options: `--port N` overrides the port from `rhyolite.json` (default `6270`), `--version` prints the version.
+Options: `--port N` overrides the port from `rhyolite.json` (default `6270`), `--verbosity none|basic|verbose` sets the terminal output (default `verbose`): `none` prints nothing, `basic` prints only the setup info (configuration and startup banner), `verbose` also echoes every log line. `rhyolite.log` is written in all modes. `--version` prints the version.
 
 To rotate the token, empty the `"token"` field in `rhyolite.json` and restart.
 

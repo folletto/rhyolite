@@ -14,6 +14,8 @@ Every line is strict logfmt: `ts=<RFC3339> event=<name>` followed by `key=value`
 
 `bearerAuth` consults an in-memory `clientTracker` (reset on restart, capped at 10,000 IPs, after which nothing new is recorded or announced). The first request from an unseen IP logs `event=client_new ip=<ip> auth=ok|fail` before its `auth_fail`/`tool`/`http` lines. Requests rejected earlier by the origin guard are not announced. `logfile.Writer.SetEcho(out, highlight...)` wraps highlighted events in ANSI bold on the echo only when `out` is a terminal (`os.File` with `ModeCharDevice`); the log file stays plain.
 
-## 4. Verbosity levels (planned)
+## 4. Verbosity levels (done)
 
 `--verbosity none|basic|verbose` flag, default `verbose`. `none` prints nothing on the terminal, `basic` prints setup info only (today's banner), `verbose` prints setup info plus log lines.
+
+Implemented in `run`: an invalid value is an error naming the valid ones; `none` swaps stdout for `io.Discard` after `--version` handling (errors still go to stderr); the echo is only set in `verbose`. The log file is written in every mode.
