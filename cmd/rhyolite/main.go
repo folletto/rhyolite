@@ -111,7 +111,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 
 	printBanner(stdout, dir, cfg, actual)
 	logw.SetEcho(stdout)
-	logw.Printf("start rhyolite %s vault=%s listen=%s", version, filepath.Base(dir), ln.Addr())
+	logw.Log("start", "version", version, "vault", filepath.Base(dir), "listen", ln.Addr())
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
@@ -124,6 +124,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = srv.Shutdown(sctx)
-	logw.Printf("stop")
+	logw.Log("stop")
 	return err
 }

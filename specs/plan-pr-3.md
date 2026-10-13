@@ -6,9 +6,9 @@ Rhyolite logs requests, auth failures, tool calls and start/stop to `rhyolite.lo
 
 `logfile.Writer` gets an optional echo writer (`SetEcho`). `Printf` formats each line once and writes the identical bytes (same timestamp, same text) to the file and to the echo writer under the same mutex, so lines never interleave. `Write` echoes too. `main.go` sets the echo to stdout after the banner is printed, before the `start` line, so the banner stays at the top. Tests: `internal/logfile` (echo equals file) and `cmd/rhyolite` (log lines appear on stdout after the banner).
 
-## 2. Parseable log format (planned)
+## 2. Parseable log format (done)
 
-Make the log format easy to parse by an algorithm.
+Every line is strict logfmt: `ts=<RFC3339> event=<name>` followed by `key=value` pairs in a fixed order. Values that are empty or contain a space, `=`, `"` or a control character are quoted with `strconv.Quote`; all others are bare. Events: `start`, `stop`, `http`, `auth_fail`, `tool` (keys documented in the README). The formatter is `logfile.Format`; `logfile.Writer.Log(event, kv...)` replaced `Printf`, and the server's `Logger` interface is now `Log(event string, kv ...any)`. A `time.Duration` value is rendered as integer milliseconds (`dur_ms`). Tool errors keep the 200-character truncation and appear as an extra `error` key. Tests: formatter edge cases and a round trip through a small logfmt parser.
 
 ## 3. Highlight new clients (planned)
 

@@ -54,7 +54,8 @@ func toolCallLog(log Logger) mcp.Middleware {
 			}
 			start := time.Now()
 			res, err := next(ctx, method, req)
-			name, args := "?", ""
+			name := "?"
+			var kv []any
 			if r, ok := req.(*mcp.CallToolRequest); ok && r.Params != nil {
 				name = r.Params.Name
 				var a struct {
@@ -63,19 +64,24 @@ func toolCallLog(log Logger) mcp.Middleware {
 				}
 				json.Unmarshal(r.Params.Arguments, &a)
 				if a.Path != "" || name == "list" {
-					args = " path=" + quote(a.Path)
+					kv = append(kv, "path", a.Path)
 				}
 				if a.Destination != "" {
-					args += " destination=" + quote(a.Destination)
+					kv = append(kv, "destination", a.Destination)
 				}
 			}
-			outcome := "ok"
+			result, errText := "ok", ""
 			if err != nil {
-				outcome = "error"
+				result = "error"
 			} else if r, ok := res.(*mcp.CallToolResult); ok && r.IsError {
-				outcome = "error: " + toolErrorText(r)
+				result, errText = "error", toolErrorText(r)
 			}
-			log.Printf("tool %s%s -> %s (%s)", name, args, outcome, time.Since(start).Round(time.Millisecond))
+			kv = append([]any{"name", name}, kv...)
+			kv = append(kv, "result", result, "dur_ms", time.Since(start))
+			if errText != "" {
+				kv = append(kv, "error", errText)
+			}
+			log.Log("tool", kv...)
 			return res, err
 		}
 	}
@@ -91,9 +97,4 @@ func toolErrorText(r *mcp.CallToolResult) string {
 		}
 	}
 	return ""
-}
-
-func quote(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
 }

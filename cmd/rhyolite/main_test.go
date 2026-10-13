@@ -156,7 +156,7 @@ func TestStartupCreatesConfigServesAndStops(t *testing.T) {
 		t.Errorf("shutdown: %v", err)
 	}
 	logb, _ := os.ReadFile(filepath.Join(dir, "rhyolite.log"))
-	if !strings.Contains(string(logb), "start rhyolite") || !strings.Contains(string(logb), "tool file_write") || strings.Contains(string(logb), cfg.Token) {
+	if !strings.Contains(string(logb), "event=start version=") || !strings.Contains(string(logb), "event=tool name=file_write path=hello.md result=ok") || strings.Contains(string(logb), cfg.Token) {
 		t.Errorf("log:\n%s", logb)
 	}
 	// Every log line is echoed to the terminal after the banner, unchanged.

@@ -56,3 +56,18 @@ make release                  # dist/ binaries for macOS, Linux, Windows (CGO-fr
 `make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).
 
 Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`) and every line is also printed to the terminal; the token and file contents are never logged.
+
+Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space-separated `key=value` pairs in a fixed order, always starting with `ts=<RFC3339> event=<name>`. A value that is empty or contains a space, `=`, `"` or a control character is double-quoted (Go string syntax, so `\"` and `\n` escapes); everything else is bare.
+
+| `event` | Keys after `ts` and `event` |
+| --- | --- |
+| `start` | `version`, `vault`, `listen` |
+| `stop` | none |
+| `http` | `method`, `path`, `status`, `dur_ms`, `ip` |
+| `auth_fail` | `method`, `path`, `ip` |
+| `tool` | `name`, `path` (when the tool takes one), `destination` (moves), `result` (`ok` or `error`), `dur_ms`, and `error` (only on failure; truncated to 200 characters) |
+
+```
+ts=2026-09-30T12:00:00+02:00 event=http method=POST path=/mcp status=200 dur_ms=12 ip=192.168.1.20
+ts=2026-09-30T12:00:00+02:00 event=tool name=file_read path="my notes/a.md" result=ok dur_ms=1
+```

@@ -11,13 +11,14 @@ import (
 )
 
 // Logger is what the server needs from a log: rhyolite.log in production.
+// kv alternates string keys and values.
 type Logger interface {
-	Printf(format string, args ...any)
+	Log(event string, kv ...any)
 }
 
 type nopLogger struct{}
 
-func (nopLogger) Printf(string, ...any) {}
+func (nopLogger) Log(string, ...any) {}
 
 // bearerAuth rejects requests without the right "Authorization: Bearer" token.
 func bearerAuth(token string, log Logger, next http.Handler) http.Handler {
@@ -26,7 +27,7 @@ func bearerAuth(token string, log Logger, next http.Handler) http.Handler {
 		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		sum := sha256.Sum256([]byte(got))
 		if !ok || subtle.ConstantTimeCompare(sum[:], want[:]) != 1 {
-			log.Printf("auth failure from %s: %s %s", clientIP(r), r.Method, r.URL.Path)
+			log.Log("auth_fail", "method", r.Method, "path", r.URL.Path, "ip", clientIP(r))
 			w.Header().Set("WWW-Authenticate", `Bearer realm="rhyolite"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
@@ -92,7 +93,7 @@ func requestLog(log Logger, next http.Handler) http.Handler {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: 200}
 		next.ServeHTTP(sw, r)
-		log.Printf("http %s %s -> %d (%s) from %s", r.Method, r.URL.Path, sw.status, time.Since(start).Round(time.Millisecond), clientIP(r))
+		log.Log("http", "method", r.Method, "path", r.URL.Path, "status", sw.status, "dur_ms", time.Since(start), "ip", clientIP(r))
 	})
 }
 
