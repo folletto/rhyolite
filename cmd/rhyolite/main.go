@@ -110,7 +110,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	}
 
 	printBanner(stdout, dir, cfg, actual)
-	logw.SetEcho(stdout)
+	logw.SetEcho(stdout, "client_new")
 	logw.Log("start", "version", version, "vault", filepath.Base(dir), "listen", ln.Addr())
 
 	errc := make(chan error, 1)

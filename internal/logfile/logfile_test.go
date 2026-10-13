@@ -198,3 +198,19 @@ func TestFormatRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+func TestNoEscapeCodesOutsideTerminal(t *testing.T) {
+	dir := t.TempDir()
+	c := &clock{time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)}
+	w, _ := newWithClock(dir, c.now)
+	var echo strings.Builder
+	w.SetEcho(&echo, "client_new")
+	w.Log("client_new", "ip", "1.2.3.4")
+	w.Close()
+	if strings.Contains(echo.String(), "\x1b") || strings.Contains(read(t, filepath.Join(dir, "rhyolite.log")), "\x1b") {
+		t.Error("escape codes written")
+	}
+	if isTerminal(&echo) {
+		t.Error("buffer reported as terminal")
+	}
+}

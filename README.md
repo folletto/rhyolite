@@ -64,10 +64,14 @@ Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space
 | `start` | `version`, `vault`, `listen` |
 | `stop` | none |
 | `http` | `method`, `path`, `status`, `dur_ms`, `ip` |
+| `client_new` | `ip`, `auth` (`ok` or `fail`: whether that first request had a valid token) |
 | `auth_fail` | `method`, `path`, `ip` |
 | `tool` | `name`, `path` (when the tool takes one), `destination` (moves), `result` (`ok` or `error`), `dur_ms`, and `error` (only on failure; truncated to 200 characters) |
 
+`client_new` is logged once, just before the first `http`/`auth_fail` line from a client IP not seen since the server started (the set is kept in memory, so a restart announces everyone again, and it stops growing at 10,000 IPs). In a terminal that line is printed in bold; the log file never contains escape codes.
+
 ```
+ts=2026-09-30T12:00:00+02:00 event=client_new ip=192.168.1.20 auth=ok
 ts=2026-09-30T12:00:00+02:00 event=http method=POST path=/mcp status=200 dur_ms=12 ip=192.168.1.20
 ts=2026-09-30T12:00:00+02:00 event=tool name=file_read path="my notes/a.md" result=ok dur_ms=1
 ```

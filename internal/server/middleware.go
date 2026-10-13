@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,12 +22,20 @@ type nopLogger struct{}
 func (nopLogger) Log(string, ...any) {}
 
 // bearerAuth rejects requests without the right "Authorization: Bearer" token.
-func bearerAuth(token string, log Logger, next http.Handler) http.Handler {
+func bearerAuth(token string, log Logger, clients *clientTracker, next http.Handler) http.Handler {
 	want := sha256.Sum256([]byte(token))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		sum := sha256.Sum256([]byte(got))
-		if !ok || subtle.ConstantTimeCompare(sum[:], want[:]) != 1 {
+		valid := ok && subtle.ConstantTimeCompare(sum[:], want[:]) == 1
+		if clients.isNew(clientIP(r)) {
+			auth := "fail"
+			if valid {
+				auth = "ok"
+			}
+			log.Log("client_new", "ip", clientIP(r), "auth", auth)
+		}
+		if !valid {
 			log.Log("auth_fail", "method", r.Method, "path", r.URL.Path, "ip", clientIP(r))
 			w.Header().Set("WWW-Authenticate", `Bearer realm="rhyolite"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -34,6 +43,31 @@ func bearerAuth(token string, log Logger, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// maxClients bounds the set of remembered client IPs so scanners cannot grow
+// it without limit; once full, no further IPs are recorded or announced.
+const maxClients = 10000
+
+// clientTracker remembers the client IPs seen since the server started (it
+// is in memory only, so a restart announces every client again).
+type clientTracker struct {
+	mu   sync.Mutex
+	seen map[string]struct{}
+}
+
+// isNew reports whether ip is seen for the first time, and records it.
+func (c *clientTracker) isNew(ip string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.seen[ip]; ok || len(c.seen) >= maxClients {
+		return false
+	}
+	if c.seen == nil {
+		c.seen = map[string]struct{}{}
+	}
+	c.seen[ip] = struct{}{}
+	return true
 }
 
 // originGuard blocks browser requests from web pages: a request carrying an

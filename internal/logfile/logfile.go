@@ -20,8 +20,9 @@ type Writer struct {
 	dir   string
 	now   func() time.Time
 	f     *os.File
-	month string    // yyyymm of the open file
-	echo  io.Writer // optional copy of every line, e.g. the terminal
+	month string          // yyyymm of the open file
+	echo  io.Writer       // optional copy of every line, e.g. the terminal
+	bold  map[string]bool // events printed in bold on the echo, when it is a terminal
 }
 
 // New opens (or creates) the log in dir.
@@ -90,11 +91,29 @@ func appendFile(dst, src string) error {
 }
 
 // SetEcho makes the Writer also write every line to out, identical to what
-// goes to the file. Pass nil to stop echoing.
-func (w *Writer) SetEcho(out io.Writer) {
+// goes to the file. Pass nil to stop echoing. When out is a terminal, lines of
+// the events named in highlight are wrapped in bold on the echo only; the file
+// and non-terminal echoes never contain escape codes.
+func (w *Writer) SetEcho(out io.Writer, highlight ...string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.echo = out
+	w.bold = nil
+	if isTerminal(out) {
+		w.bold = map[string]bool{}
+		for _, e := range highlight {
+			w.bold[e] = true
+		}
+	}
+}
+
+func isTerminal(out io.Writer) bool {
+	f, ok := out.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
 // Log writes one logfmt line: ts, event, then the alternating key/value pairs
@@ -108,6 +127,9 @@ func (w *Writer) Log(event string, kv ...any) {
 	line := Format(w.now(), event, kv...) + "\n"
 	io.WriteString(w.f, line)
 	if w.echo != nil {
+		if w.bold[event] {
+			line = "\x1b[1m" + strings.TrimSuffix(line, "\n") + "\x1b[0m\n"
+		}
 		io.WriteString(w.echo, line)
 	}
 }

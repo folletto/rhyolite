@@ -41,7 +41,7 @@ func New(o Options) http.Handler {
 	})
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", mcpHandler)
-	return requestLog(log, originGuard(bearerAuth(o.Token, log, limitBody(5<<20, mux))))
+	return requestLog(log, originGuard(bearerAuth(o.Token, log, &clientTracker{}, limitBody(5<<20, mux))))
 }
 
 // toolCallLog logs each tool call: name, session, paths, outcome, duration.
