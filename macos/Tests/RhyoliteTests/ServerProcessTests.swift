@@ -36,10 +36,11 @@ final class ServerProcessTests: XCTestCase {
     }
 
     private let wellBehaved = """
-    echo "▴ Reading rhyolite.json"
+    echo "▲ Rhyolite"
     echo "vault=$1 cwd=$(pwd -P)"
-    echo "▴ Listening on http://127.0.0.1:1/mcp"
-    trap 'echo "▴ Stopping"; exit 0' INT TERM
+    echo "● Listening"
+    echo "  on: http://127.0.0.1:1/mcp"
+    trap 'echo "■ Stopping"; exit 0' INT TERM
     while true; do sleep 0.05; done
     """
 
@@ -59,16 +60,16 @@ final class ServerProcessTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: ServerProcess.pidKey))
 
         let log = server.log.lines
-        XCTAssertEqual(log.first, "▴ Reading rhyolite.json")
+        XCTAssertEqual(log.first, "▲ Rhyolite")
         // The vault is passed as the argument and is the working directory
         // (/var is a symlink to /private/var, hence the suffix match).
         let vaultSuffix = "\(dir.lastPathComponent)/vault"
         XCTAssertTrue(log.contains { $0.hasPrefix("vault=\(vault.path) cwd=") && $0.hasSuffix(vaultSuffix) }, "\(log)")
-        XCTAssertTrue(log.contains("▴ Stopping"), "the CLI's shutdown output is kept")
+        XCTAssertTrue(log.contains("■ Stopping"), "the CLI's shutdown output is kept")
     }
 
     func testOutputFromBothStreamsIsShown() async throws {
-        let exe = try script("echo out; echo err >&2; echo \"▴ Listening on x\"; sleep 30")
+        let exe = try script("echo out; echo err >&2; echo \"● Listening\"; sleep 30")
         let server = ServerProcess(executableURL: exe, timeouts: fast)
         server.start(vaultPath: vault.path)
         try await waitFor("running") { server.state == .running }
@@ -120,7 +121,7 @@ final class ServerProcessTests: XCTestCase {
         let exe = try script("""
         trap '' INT
         trap 'exit 0' TERM
-        echo "▴ Listening on x"
+        echo "● Listening"
         while true; do sleep 0.05; done
         """)
         let server = ServerProcess(executableURL: exe, timeouts: fast)
@@ -135,7 +136,7 @@ final class ServerProcessTests: XCTestCase {
     func testEscalatesToKillWhenNothingElseWorks() async throws {
         let exe = try script("""
         trap '' INT TERM
-        echo "▴ Listening on x"
+        echo "● Listening"
         while true; do sleep 0.05; done
         """)
         let server = ServerProcess(executableURL: exe, timeouts: fast)

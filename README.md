@@ -12,8 +12,12 @@ bin/rhyolite ~/Notes          # serve ~/Notes (default: the current folder)
 On start it creates (or reads) `rhyolite.json` in the folder, holding the access token, then prints ready-to-paste `mcp.json` entries:
 
 ```
-▴ Creating rhyolite.json
-▴ Listening on http://192.168.1.20:6270/mcp
+▲ Rhyolite
+  vault: /Users/me/Notes
+› Creating: rhyolite.json
+
+● Listening
+  on: http://192.168.1.20:6270/mcp
 …
 ```
 

@@ -103,8 +103,11 @@ func TestStartupCreatesConfigServesAndStops(t *testing.T) {
 	dir := t.TempDir()
 	out, stop := start(t, "--port", "0", dir)
 
-	if !strings.HasPrefix(out.String(), "▴ Creating rhyolite.json\n") {
-		t.Errorf("first line: %q", strings.SplitN(out.String(), "\n", 2)[0])
+	if !strings.HasPrefix(out.String(), "▲ Rhyolite\n  vault: ") || !strings.Contains(out.String(), "› Creating: rhyolite.json\n") {
+		t.Errorf("header or creation notice missing:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "● Listening\n  on: http://") {
+		t.Errorf("no listening line:\n%s", out.String())
 	}
 	var cfg struct{ Token string }
 	b, err := os.ReadFile(filepath.Join(dir, "rhyolite.json"))
@@ -182,8 +185,8 @@ func TestRestartReadsExistingConfig(t *testing.T) {
 
 	out, stop := start(t, "--port", "0", dir)
 	defer stop()
-	if !strings.HasPrefix(out.String(), "▴ Reading rhyolite.json\n") {
-		t.Errorf("first line: %q", strings.SplitN(out.String(), "\n", 2)[0])
+	if !strings.HasPrefix(out.String(), "▲ Rhyolite\n") || strings.Contains(out.String(), "Creating") {
+		t.Errorf("unexpected start output:\n%s", out.String())
 	}
 	second, _ := os.ReadFile(filepath.Join(dir, "rhyolite.json"))
 	if string(first) != string(second) {

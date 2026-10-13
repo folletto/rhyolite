@@ -33,7 +33,7 @@ public final class ServerProcess {
     /// UserDefaults key holding the child's PID while it runs (see `OrphanReaper`).
     nonisolated public static let pidKey = "serverPID"
     /// The CLI prints this once it has bound its port.
-    nonisolated static let readyMarker = "Listening on"
+    nonisolated static let readyMarker = "● Listening"
 
     public private(set) var state: ServerState = .stopped
     public private(set) var log = LogBuffer()

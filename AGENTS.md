@@ -24,11 +24,11 @@ make release   # dist/ for macOS/Linux/Windows (+ Rhyolite-macos.zip on macOS)
 - `internal/trash/`: OS trash per platform (macOS, freedesktop, Windows).
 - `internal/logfile/`: monthly-rolling `rhyolite.log`.
 - `macos/`: the native Swift app (SwiftPM, no Xcode project). `RhyoliteCore` holds settings, the log buffer and the child-process wrapper (unit-tested); `Rhyolite` is the AppKit/SwiftUI shell. The CLI is embedded in the bundle at `Contents/Helpers/rhyolite`.
-- `specs/`: plans, one per PR, named `plan-pr-<N>.md` (N = the PR number). Each PR has its own plan; create it if missing (see "Plan → PR workflow"). `specs/plan-pr-1.md` is the original design: read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations) before changing behaviour.
+- `specs/`: plans named `plan-pr-<N>.md` (N = the PR number), one per PR whose work started with a plan; simple or incremental changes don't need one (see "Plan → PR workflow"). `specs/plan-pr-1.md` is the original design: read §5 (vault rules), §6 (tools), §7 (conflicts), §12 (deviations) before changing behaviour.
 
 ## Plan → PR workflow
 
-The PR number isn't known until the PR exists, so once a plan is ready:
+This workflow applies only when the work starts with planning; simple or incremental changes skip it and open the PR directly from the implementation commits. The PR number isn't known until the PR exists, so once a plan is ready:
 
 1. Write the plan under a temporary name (e.g. `specs/plan-<topic>.md`), commit it alone on a new branch, push, and open the PR.
 2. Rename the file to `specs/plan-pr-<N>.md` using the new PR number, and remove any placeholder notes about renaming.
@@ -49,7 +49,7 @@ Implementation commits go on top of that first commit.
 - Code must stay `gofmt`/`go vet` clean and pass cross-compilation for all three OSes (platform code uses build-tagged files, e.g. `system_darwin.go`).
 - Add tests alongside changes (`*_test.go`, integration tests in `internal/server`). Keep the fuzz test for path validation passing.
 - Go files must not reference plan files (`specs/`); keep comments self-contained.
-- Update `README.md` (user-facing) and the PR's plan in `specs/` when behaviour changes.
-- The macOS app only wraps the CLI: it starts and stops it and shows its output. Never move server logic into Swift, and keep the CLI's stdout/stderr and SIGINT/SIGTERM behaviour stable, because the app relies on them (`▴ Listening on` marks a successful start).
+- Update `README.md` (user-facing) when behaviour changes, and the PR's plan in `specs/` if it has one.
+- The macOS app only wraps the CLI: it starts and stops it and shows its output. Never move server logic into Swift, and keep the CLI's stdout/stderr and SIGINT/SIGTERM behaviour stable, because the app relies on them (`● Listening` marks a successful start).
 - Swift builds only on macOS. Run swift commands outside restrictive sandboxes (they write to system caches).
 - Not implemented yet: TLS (plain HTTP only).
