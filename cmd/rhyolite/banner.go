@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sort"
 	"strconv"
 
@@ -31,16 +32,30 @@ func lanIPs() []string {
 	return append(private, other...)
 }
 
-// hostsFor lists the addresses clients can use for a listen host.
-func hostsFor(listenHost string) []string {
-	ip := net.ParseIP(listenHost)
-	if listenHost == "" || (ip != nil && ip.IsUnspecified()) {
-		if ips := lanIPs(); len(ips) > 0 {
-			return ips
+// hostsFor lists the addresses clients can use, best first: the configured
+// advertise host, then the mDNS name and the LAN IPs when listening on all
+// interfaces, otherwise the listen host itself.
+func hostsFor(cfg *config.Config, name string, ips []string) []string {
+	var hosts []string
+	add := func(h string) {
+		if h != "" && !slices.Contains(hosts, h) {
+			hosts = append(hosts, h)
 		}
-		return []string{"localhost"}
 	}
-	return []string{listenHost}
+	add(cfg.Advertise)
+	ip := net.ParseIP(cfg.Host)
+	if cfg.Host == "" || (ip != nil && ip.IsUnspecified()) {
+		add(name)
+		for _, h := range ips {
+			add(h)
+		}
+	} else {
+		add(cfg.Host)
+	}
+	if len(hosts) == 0 {
+		add("localhost")
+	}
+	return hosts
 }
 
 func pretty(v any) string {
@@ -69,13 +84,17 @@ func nativeConfig(url, token string) any {
 }
 
 func printBanner(w io.Writer, cfg *config.Config, port int) {
-	hosts := hostsFor(cfg.Host)
+	hosts := hostsFor(cfg, localName(), lanIPs())
 	url := func(h string) string { return "http://" + net.JoinHostPort(h, strconv.Itoa(port)) + "/mcp" }
 
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "● Listening")
-	for _, h := range hosts {
-		fmt.Fprintf(w, "  on: %s\n", url(h))
+	for i, h := range hosts {
+		label := "on"
+		if i > 0 {
+			label = "or"
+		}
+		fmt.Fprintf(w, "  %s: %s\n", label, url(h))
 	}
 	fmt.Fprintln(w, "› Log: rhyolite.log")
 	fmt.Fprintln(w)

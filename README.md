@@ -17,9 +17,12 @@ On start it creates (or reads) `rhyolite.json` in the folder, holding the access
 › Creating: rhyolite.json
 
 ● Listening
-  on: http://192.168.1.20:6270/mcp
+  on: http://Studio.local:6270/mcp
+  or: http://192.168.1.20:6270/mcp
 …
 ```
+
+The first URL uses the machine's local (mDNS) name, which keeps working when the router hands out a new IP; the snippets use it too. The name comes from System Settings → General → Sharing → Local hostname on macOS, the computer name on Windows, and the hostname on Linux when Avahi is running; elsewhere only IPs are shown. The LAN IPs are listed as fallbacks, for networks that block mDNS (guest Wi-Fi, networks with client isolation, many office networks). If two machines claim the same name, macOS renames one (`Studio-2.local`) and client configs need updating. To print a different host first, e.g. a name your router publishes or a fixed IP, set `"advertise": "studio.lan"` in `rhyolite.json` (a bare host or IP, no scheme or port).
 
 Two flavours are printed: one using [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) for clients that insist on HTTPS, and one for clients that speak HTTP directly (e.g. `claude mcp add --transport http`).
 

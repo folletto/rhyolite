@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 // FileName is the settings file kept in the vault root.
@@ -26,6 +28,18 @@ type Config struct {
 	Token   string `json:"token"`
 	Host    string `json:"host"`
 	Port    int    `json:"port"`
+	// Advertise, when set, is the host printed in the client URLs instead
+	// of the automatically found local name and LAN IPs.
+	Advertise string `json:"advertise,omitempty"`
+}
+
+// hostName matches a DNS name such as "studio.lan" or "Studio.local".
+var hostName = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
+
+// validAdvertise reports whether h is a bare host name or IP address: no
+// scheme, port, path or brackets.
+func validAdvertise(h string) bool {
+	return h == "" || net.ParseIP(h) != nil || (len(h) <= 253 && hostName.MatchString(h))
 }
 
 // Status says what Load did with the file.
@@ -64,6 +78,9 @@ func Load(dir string) (*Config, Status, error) {
 	var c Config
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, Read, fmt.Errorf("%s is not valid JSON: %w", FileName, err)
+	}
+	if !validAdvertise(c.Advertise) {
+		return nil, Read, fmt.Errorf("%s: invalid \"advertise\" %q: use a host name or IP address, without scheme or port", FileName, c.Advertise)
 	}
 	dirty := false
 	if c.Version == 0 {

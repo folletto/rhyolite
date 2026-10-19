@@ -86,3 +86,46 @@ func TestTokensAreUnique(t *testing.T) {
 		t.Fatal("tokens equal")
 	}
 }
+
+func TestAdvertiseIsOptional(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, FileName)
+	Load(dir)
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "advertise") {
+		t.Errorf("empty advertise written:\n%s", data)
+	}
+	content := `{"version":1,"token":"abc","host":"0.0.0.0","port":6270,"advertise":"studio.lan"}`
+	os.WriteFile(path, []byte(content), 0o600)
+	c, _, err := Load(dir)
+	if err != nil || c.Advertise != "studio.lan" {
+		t.Fatalf("Load = %+v, %v", c, err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != content {
+		t.Errorf("complete file rewritten:\n%s", data)
+	}
+}
+
+func TestAdvertiseValidation(t *testing.T) {
+	for v, ok := range map[string]bool{
+		"studio.lan":        true,
+		"Studio.local":      true,
+		"192.168.1.20":      true,
+		"fe80::1":           true,
+		"http://studio.lan": false,
+		"studio.lan:6270":   false,
+		"[fe80::1]":         false,
+		"studio.lan/mcp":    false,
+		"my mac":            false,
+		".studio":           false,
+	} {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, FileName), []byte(`{"token":"abc","advertise":"`+v+`"}`), 0o600)
+		_, _, err := Load(dir)
+		if (err == nil) != ok {
+			t.Errorf("advertise %q: err = %v", v, err)
+		}
+		if err != nil && !strings.Contains(err.Error(), "advertise") {
+			t.Errorf("advertise %q: error does not name the field: %v", v, err)
+		}
+	}
+}

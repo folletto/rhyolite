@@ -15,7 +15,7 @@ The startup banner and the ready-to-paste `mcp.json` snippets use the machine's 
 - No startup check that the name resolves. Resolving `.local` from Go without cgo is unreliable across platforms, and a failed check would only produce noise; the IP fallbacks cover it.
 - No HTTPS changes (discussed separately).
 
-## 2. Where the name comes from
+## 2. Where the name comes from (done)
 
 A new function `localName() string` in `cmd/rhyolite/`, one build-tagged file per platform. It returns a bare name with `.local` appended, or `""` when the platform has no reliable mDNS name:
 
@@ -28,7 +28,7 @@ A new function `localName() string` in `cmd/rhyolite/`, one build-tagged file pe
 
 The result is validated as a DNS label (letters, digits, `-`, at most 63 characters); anything else is discarded and the CLI falls back to IPs. The exec and file checks sit behind package-level function variables so tests can stub them on any OS.
 
-## 3. Which hosts the banner prints
+## 3. Which hosts the banner prints (done)
 
 `hostsFor` (in `banner.go`) becomes `hostsFor(cfg, localName, lanIPs)`:
 
@@ -51,15 +51,15 @@ Banner:
 
 The `● Listening` line is unchanged, so the macOS app needs nothing.
 
-## 4. Configuration
+## 4. Configuration (done)
 
 `config.Config` gets `Advertise string \`json:"advertise,omitempty"\``. It is optional and never written by default, so existing `rhyolite.json` files are not rewritten. It holds a host only (no scheme, no port), and `Load` rejects a value containing `/`, `:` (other than an IPv6 literal) or spaces with an error naming the field.
 
-## 5. IPv6
+## 5. IPv6 (done)
 
 A `.local` name often resolves to the Mac's IPv6 addresses as well as IPv4. No listener change is needed: Go's `net.Listen("tcp", "0.0.0.0:port")` treats the unspecified address as a wildcard and opens a dual-stack socket on macOS, Linux and Windows, so IPv6 clients are accepted. A test locks this in by dialling `[::1]` against a server started with the default host (skipped where IPv6 is unavailable).
 
-## 6. Tests
+## 6. Tests (done)
 
 - `localName`: stubbed `scutil` output (trailing newline trimmed, error or timeout → `""`, invalid label → `""`), Avahi present/absent on Linux, hostname with a domain suffix → first label only.
 - `hostsFor`: name first then IPs; `advertise` wins and is de-duplicated; specific listen host → that host only; nothing found → `localhost`.
@@ -67,7 +67,7 @@ A `.local` name often resolves to the Mac's IPv6 addresses as well as IPv4. No l
 - Config: `advertise` round-trips, is omitted when empty, invalid values are rejected; a file without it is not rewritten.
 - Dual-stack listener test (§5).
 
-## 7. Documentation
+## 7. Documentation (done)
 
 - `README.md`: the quick-start banner shows the local name; a short paragraph says where the name comes from, that IPs remain as fallbacks (guest Wi-Fi and networks with client isolation block mDNS), that macOS may rename the machine to `Name-2.local` on a conflict, and how to use `"advertise"`.
 - `AGENTS.md`: no change needed.
