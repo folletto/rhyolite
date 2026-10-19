@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// The window's content: a fixed sidebar of tabs, with the selected tab's page beside it.
+/// The window's content: a fixed sidebar of tabs that can't be collapsed, with the selected tab's page beside it.
 struct MainView: View {
     let model: AppModel
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             List(Tab.allCases, selection: selection) { tab in
                 Label(tab.title, systemImage: tab.symbol)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 180, max: 180)
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             switch model.selectedTab {
             case .server: ServerTab(model: model)
@@ -17,7 +18,6 @@ struct MainView: View {
             case .log: LogTab(model: model)
             }
         }
-        .toolbar(removing: .sidebarToggle)
     }
 
     /// The list's selection is optional. A cleared selection keeps the current tab.
