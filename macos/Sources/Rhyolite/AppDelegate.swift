@@ -13,9 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = buildMainMenu()
 
         // A server that fails while the window is hidden (including a failed
-        // auto-start) brings the window up, so the error in the log is seen.
+        // auto-start) brings the window up on the Log tab, so the error is seen.
         model.server.onStateChange = { [weak self] state in
             guard let self, case .failed = state, !windowController.isVisible else { return }
+            model.selectedTab = .log
             windowController.present()
         }
         NotificationCenter.default.addObserver(
@@ -53,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Stops the CLI first, then lets the app quit.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        model.prepareToQuit()
         guard model.server.isActive else { return .terminateNow }
         if !terminating {
             terminating = true

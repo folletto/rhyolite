@@ -35,9 +35,11 @@ final class ServerProcessTests: XCTestCase {
         }
     }
 
+    /// Prints each argument on its own `arg=` line, then the working directory as `cwd=`.
     private let wellBehaved = """
     echo "▲ Rhyolite"
-    echo "vault=$1 cwd=$(pwd -P)"
+    for arg in "$@"; do echo "arg=$arg"; done
+    echo "cwd=$(pwd -P)"
     echo "● Listening"
     echo "  on: http://127.0.0.1:1/mcp"
     trap 'echo "■ Stopping"; exit 0' INT TERM
@@ -61,11 +63,33 @@ final class ServerProcessTests: XCTestCase {
 
         let log = server.log.lines
         XCTAssertEqual(log.first, "▲ Rhyolite")
-        // The vault is passed as the argument and is the working directory
+        // The vault is the last argument and is the working directory
         // (/var is a symlink to /private/var, hence the suffix match).
         let vaultSuffix = "\(dir.lastPathComponent)/vault"
-        XCTAssertTrue(log.contains { $0.hasPrefix("vault=\(vault.path) cwd=") && $0.hasSuffix(vaultSuffix) }, "\(log)")
+        XCTAssertEqual(argumentsSeen(server).last, vault.path)
+        XCTAssertTrue(log.contains { $0.hasPrefix("cwd=") && $0.hasSuffix(vaultSuffix) }, "\(log)")
         XCTAssertTrue(log.contains("■ Stopping"), "the CLI's shutdown output is kept")
+    }
+
+    /// The arguments the fake CLI was started with, as `wellBehaved` echoed them.
+    private func argumentsSeen(_ server: ServerProcess) -> [String] {
+        server.log.lines.filter { $0.hasPrefix("arg=") }.map { String($0.dropFirst("arg=".count)) }
+    }
+
+    func testStartsWithLANAccessByDefault() async throws {
+        let server = ServerProcess(executableURL: try script(wellBehaved), timeouts: fast)
+        server.start(vaultPath: vault.path)
+        try await waitFor("running") { server.state == .running }
+        XCTAssertEqual(argumentsSeen(server), ["--access", "lan", vault.path])
+        await server.stop()
+    }
+
+    func testLocalAccessIsPassedBeforeTheVault() async throws {
+        let server = ServerProcess(executableURL: try script(wellBehaved), timeouts: fast)
+        server.start(vaultPath: vault.path, access: .local)
+        try await waitFor("running") { server.state == .running }
+        XCTAssertEqual(argumentsSeen(server), ["--access", "local", vault.path])
+        await server.stop()
     }
 
     func testOutputFromBothStreamsIsShown() async throws {

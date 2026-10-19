@@ -51,6 +51,24 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(s.isConfigured)
     }
 
+    func testAllowLANDefaultsToTrue() {
+        XCTAssertTrue(Settings(defaults: defaults).allowLAN)
+    }
+
+    func testAllowLANRoundTrips() {
+        let s = Settings(defaults: defaults)
+        s.allowLAN = false
+        XCTAssertFalse(Settings(defaults: defaults).allowLAN)
+        s.allowLAN = true
+        XCTAssertTrue(Settings(defaults: defaults).allowLAN)
+    }
+
+    func testSelectedTabDefaultsToEmptyAndRoundTrips() {
+        XCTAssertEqual(Settings(defaults: defaults).selectedTab, "")
+        Settings(defaults: defaults).selectedTab = "log"
+        XCTAssertEqual(Settings(defaults: defaults).selectedTab, "log")
+    }
+
     func testLaunchAction() {
         XCTAssertEqual(launchAction(isConfigured: false), .showWindow)
         XCTAssertEqual(launchAction(isConfigured: true), .autoStart)

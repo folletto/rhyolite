@@ -10,6 +10,12 @@ public enum ServerState: Equatable, Sendable {
     case failed(String)
 }
 
+/// Which network the CLI serves: the LAN, or only this machine. Maps to its `--access` flag.
+public enum AccessMode: String, Sendable {
+    case lan
+    case local
+}
+
 /// How long to wait at each step when stopping before escalating.
 public struct StopTimeouts: Sendable {
     /// After SIGINT. The CLI's own graceful shutdown takes up to 5 s.
@@ -61,14 +67,16 @@ public final class ServerProcess {
         }
     }
 
-    public func start(vaultPath: String) {
+    /// Starts the CLI on `vaultPath`, serving either the LAN or only this machine, per `access`.
+    public func start(vaultPath: String, access: AccessMode = .lan) {
         guard !isActive else { return }
         log.clear()
         setState(.starting)
 
         let p = Process()
         p.executableURL = executableURL
-        p.arguments = [vaultPath]
+        // Flags must come before the folder: the CLI's flag parsing stops at the first positional argument.
+        p.arguments = ["--access", access.rawValue, vaultPath]
         p.currentDirectoryURL = URL(fileURLWithPath: vaultPath, isDirectory: true)
         p.standardInput = FileHandle.nullDevice
         let out = Pipe()
