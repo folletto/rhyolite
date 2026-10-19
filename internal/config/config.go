@@ -22,6 +22,13 @@ const (
 	DefaultPort = 6270 // 6-2-7 spells M-C-P on a phone keypad; unassigned by IANA.
 )
 
+// Values of the access setting: AccessLAN serves this machine and the LAN (the
+// default), AccessLocal serves only connections from this machine.
+const (
+	AccessLAN   = "lan"
+	AccessLocal = "local"
+)
+
 // Config is the content of rhyolite.json.
 type Config struct {
 	Version int    `json:"version"`
@@ -31,6 +38,9 @@ type Config struct {
 	// Advertise, when set, is the host printed in the client URLs instead
 	// of the automatically found local name and LAN IPs.
 	Advertise string `json:"advertise,omitempty"`
+	// Access, when set, is AccessLAN or AccessLocal: which connections are
+	// served. Empty means AccessLAN.
+	Access string `json:"access,omitempty"`
 }
 
 // hostName matches a DNS name such as "studio.lan" or "Studio.local".
@@ -40,6 +50,12 @@ var hostName = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
 // scheme, port, path or brackets.
 func validAdvertise(h string) bool {
 	return h == "" || net.ParseIP(h) != nil || (len(h) <= 253 && hostName.MatchString(h))
+}
+
+// ValidAccess reports whether s is an accepted access value: empty, AccessLAN
+// or AccessLocal.
+func ValidAccess(s string) bool {
+	return s == "" || s == AccessLAN || s == AccessLocal
 }
 
 // Status says what Load did with the file.
@@ -81,6 +97,9 @@ func Load(dir string) (*Config, Status, error) {
 	}
 	if !validAdvertise(c.Advertise) {
 		return nil, Read, fmt.Errorf("%s: invalid \"advertise\" %q: use a host name or IP address, without scheme or port", FileName, c.Advertise)
+	}
+	if !ValidAccess(c.Access) {
+		return nil, Read, fmt.Errorf("%s: invalid \"access\" %q: use \"lan\" or \"local\"", FileName, c.Access)
 	}
 	dirty := false
 	if c.Version == 0 {

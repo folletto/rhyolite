@@ -425,7 +425,48 @@ func TestHostGuard(t *testing.T) {
 			req = req.WithContext(context.WithValue(req.Context(), http.LocalAddrContextKey, c.local))
 		}
 		rec := httptest.NewRecorder()
-		hostGuard(c.names, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })).ServeHTTP(rec, req)
+		hostGuard(c.names, false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })).ServeHTTP(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("%s (Host %q): status %d, want %d", c.name, c.host, rec.Code, c.want)
+		}
+		if c.want == 403 && !strings.Contains(rec.Body.String(), "Forbidden: invalid Host header") {
+			t.Errorf("%s: body %q", c.name, rec.Body.String())
+		}
+	}
+}
+
+// With all set (the listener is wrapped with LocalOnly), the Host check also
+// covers a connection on a LAN address: a foreign Host is refused there, while
+// the connection's own address and the configured names pass.
+func TestHostGuardAllConnections(t *testing.T) {
+	lan := &net.TCPAddr{IP: net.ParseIP("192.168.1.20"), Port: 6270}
+	lan6 := &net.TCPAddr{IP: net.ParseIP("2001:db8::20"), Port: 6270}
+	cases := []struct {
+		name  string
+		local *net.TCPAddr
+		names []string
+		host  string
+		want  int
+	}{
+		{"local name", lan, []string{"wombat.local"}, "wombat.local:6270", 200},
+		{"own address in names", lan, []string{"192.168.1.20"}, "192.168.1.20:6270", 200},
+		{"own address", lan, nil, "192.168.1.20:6270", 200},
+		{"other address", lan, nil, "192.168.1.21:6270", 403},
+		{"own IPv6 address", lan6, nil, "[2001:db8::20]:6270", 200},
+		{"own IPv6 address without port", lan6, nil, "[2001:db8::20]", 200},
+		{"other IPv6 address", lan6, nil, "[2001:db8::21]:6270", 403},
+		{"localhost", lan, nil, "localhost:6270", 200},
+		{"IPv4 loopback", lan, nil, "127.0.0.1:6270", 200},
+		{"foreign name", lan, []string{"wombat.local"}, "evil.example:6270", 403},
+		{"local name not configured", lan, nil, "wombat.local:6270", 403},
+		{"no local address", nil, nil, "192.168.1.20:6270", 403},
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest("POST", "/mcp", nil)
+		req.Host = c.host
+		req = req.WithContext(context.WithValue(req.Context(), http.LocalAddrContextKey, c.local))
+		rec := httptest.NewRecorder()
+		hostGuard(c.names, true, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })).ServeHTTP(rec, req)
 		if rec.Code != c.want {
 			t.Errorf("%s (Host %q): status %d, want %d", c.name, c.host, rec.Code, c.want)
 		}

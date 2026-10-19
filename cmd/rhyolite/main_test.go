@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -355,6 +357,92 @@ func TestVerbosityLevels(t *testing.T) {
 func TestInvalidVerbosity(t *testing.T) {
 	err := run(context.Background(), []string{"--verbosity", "loud", t.TempDir()}, &syncBuf{}, &syncBuf{})
 	if err == nil || !strings.Contains(err.Error(), "none, basic or verbose") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// The access mode changes the banner's access line and what is served. The
+// URLs and mcp.json snippets are the same in both modes, so clients never need
+// reconfiguring when the mode changes.
+func TestAccessModes(t *testing.T) {
+	dir := t.TempDir()
+	lan, stop := start(t, "--port", "0", dir)
+	if !strings.Contains(lan.String(), "› Access: local + LAN\n› Log:") {
+		t.Errorf("default banner:\n%s", lan.String())
+	}
+	if err := stop(); err != nil {
+		t.Fatal(err)
+	}
+	// The local run takes the same port, so the URLs can be compared exactly.
+	port := regexp.MustCompile(`:(\d+)/mcp`).FindStringSubmatch(lan.String())[1]
+	local, stop := start(t, "--port", port, "--access", "local", dir)
+	if !strings.Contains(local.String(), "› Access: local only\n› Log:") {
+		t.Errorf("local banner:\n%s", local.String())
+	}
+	urls := regexp.MustCompile(`(?m)^  (on|or): .*$`)
+	if got, want := urls.FindAllString(local.String(), -1), urls.FindAllString(lan.String(), -1); len(want) == 0 || !slices.Equal(got, want) {
+		t.Errorf("URL lines: local %q, lan %q", got, want)
+	}
+	lanRemote, lanNative := extractConfigs(t, lan.String())
+	localRemote, localNative := extractConfigs(t, local.String())
+	if !reflect.DeepEqual(lanRemote, localRemote) || !reflect.DeepEqual(lanNative, localNative) {
+		t.Errorf("mcp.json snippets differ:\n%s", local.String())
+	}
+
+	// The token is still accepted over loopback in local mode.
+	var cfg struct{ Token string }
+	b, _ := os.ReadFile(filepath.Join(dir, "rhyolite.json"))
+	json.Unmarshal(b, &cfg)
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:"+port+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}`))
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("local mode, request over 127.0.0.1: status %d", resp.StatusCode)
+	}
+	if err := stop(); err != nil {
+		t.Fatal(err)
+	}
+	logb, _ := os.ReadFile(filepath.Join(dir, "rhyolite.log"))
+	if !regexp.MustCompile(`event=start .*access=local\n`).Match(logb) || strings.Contains(string(logb), cfg.Token) {
+		t.Errorf("log:\n%s", logb)
+	}
+}
+
+func TestAccessFromFileAndFlag(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "rhyolite.json"), []byte(`{"version":1,"token":"tok","access":"local"}`), 0o600)
+	out, stop := start(t, "--port", "0", dir)
+	if !strings.Contains(out.String(), "› Access: local only\n› Log:") {
+		t.Errorf("setting from rhyolite.json not used:\n%s", out.String())
+	}
+	if err := stop(); err != nil {
+		t.Fatal(err)
+	}
+	out, stop = start(t, "--port", "0", "--access", "lan", dir)
+	defer stop()
+	if !strings.Contains(out.String(), "› Access: local + LAN\n› Log:") {
+		t.Errorf("--access lan does not override the file:\n%s", out.String())
+	}
+}
+
+func TestInvalidAccessIsAnError(t *testing.T) {
+	err := run(context.Background(), []string{"--access", "bogus", t.TempDir()}, &syncBuf{}, &syncBuf{})
+	if err == nil || !strings.Contains(err.Error(), "lan or local") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestInvalidAccessInConfigIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "rhyolite.json"), []byte(`{"version":1,"token":"tok","access":"bogus"}`), 0o600)
+	err := run(context.Background(), []string{"--port", "0", dir}, &syncBuf{}, &syncBuf{})
+	if err == nil || !strings.Contains(err.Error(), "access") {
 		t.Errorf("err = %v", err)
 	}
 }

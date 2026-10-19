@@ -13,13 +13,13 @@ make app       # -> bin/Rhyolite.app (macOS only; needs the Swift toolchain)
 make release   # dist/ for macOS/Linux/Windows (+ Rhyolite-macos.zip on macOS)
 ```
 
-`make` wraps `scripts/build.sh` and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N] [--verbosity none|basic|verbose]`.
+`make` wraps `scripts/build.sh` and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N] [--access lan|local] [--verbosity none|basic|verbose]`.
 
 ## Layout
 
 - `cmd/rhyolite/`: CLI entry, startup banner.
-- `internal/config/`: `rhyolite.json` (token, port) handling.
-- `internal/server/`: MCP HTTP server; `tools.go` defines the 14 tools, `middleware.go` has bearer auth, origin guard, request logging.
+- `internal/config/`: `rhyolite.json` (token, port, access) handling.
+- `internal/server/`: MCP HTTP server; `tools.go` defines the 14 tools, `middleware.go` has bearer auth, origin guard, request logging; `listener.go` is the local-only listener for `access: local`.
 - `internal/vault/`: all file operations, confined to the vault root via `os.Root`; paths, frontmatter, search, move, staleness tracker, pagination cursors.
 - `internal/trash/`: OS trash per platform (macOS, freedesktop, Windows).
 - `internal/logfile/`: monthly-rolling `rhyolite.log`.

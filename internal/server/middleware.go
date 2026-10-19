@@ -71,13 +71,17 @@ func (c *clientTracker) isNew(ip string) bool {
 	return true
 }
 
-// hostGuard is the DNS-rebinding protection for connections that arrive over
-// loopback, in place of the MCP SDK's check. The SDK accepts only localhost and
-// loopback IPs as Host, which also refuses the machine's own name. On a Mac,
-// "wombat.local" resolves to loopback, so a local client sends that name as
-// Host: the names given (the machine's own names) are accepted too.
-// Connections on other addresses pass unchanged.
-func hostGuard(names []string, next http.Handler) http.Handler {
+// hostGuard is the DNS-rebinding protection, in place of the MCP SDK's check.
+// It checks the Host of connections that arrive over loopback, and of all
+// connections when all is set (the LocalOnly listener admits only this
+// machine's connections, see Options.LocalOnly). Other connections pass
+// unchanged. The SDK accepts only localhost and loopback IPs as Host, which
+// also refuses the machine's own name. On a Mac, "wombat.local" resolves to
+// loopback, so a local client sends that name as Host: the names given (the
+// machine's own names) are accepted too. So is the IP address the connection
+// arrived on, so a LAN address works from this machine as well. A DNS-rebinding
+// page sends its own domain name as Host, so it still gets 403.
+func hostGuard(names []string, all bool, next http.Handler) http.Handler {
 	allowed := map[string]bool{}
 	for _, n := range names {
 		if h := hostKey(n); h != "" {
@@ -85,9 +89,10 @@ func hostGuard(names []string, next http.Handler) http.Handler {
 		}
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if local, _ := r.Context().Value(http.LocalAddrContextKey).(*net.TCPAddr); local != nil && local.IP.IsLoopback() {
+		local, _ := r.Context().Value(http.LocalAddrContextKey).(*net.TCPAddr)
+		if all || (local != nil && local.IP.IsLoopback()) {
 			h := hostKey(r.Host)
-			if !allowed[h] && !loopbackHost(h) {
+			if !allowed[h] && !loopbackHost(h) && !localIPHost(h, local) {
 				http.Error(w, fmt.Sprintf("Forbidden: invalid Host header %q", r.Host), http.StatusForbidden)
 				return
 			}
@@ -113,6 +118,13 @@ func loopbackHost(h string) bool {
 	}
 	ip := net.ParseIP(h)
 	return ip != nil && ip.IsLoopback()
+}
+
+// localIPHost reports whether a hostKey is the IP of local, the local address of
+// a connection.
+func localIPHost(h string, local *net.TCPAddr) bool {
+	ip := net.ParseIP(h)
+	return ip != nil && local != nil && ip.Equal(local.IP)
 }
 
 // originGuard blocks browser requests from web pages: a request carrying an

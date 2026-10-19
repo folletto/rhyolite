@@ -129,3 +129,62 @@ func TestAdvertiseValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestAccessRoundTrips(t *testing.T) {
+	for _, v := range []string{AccessLocal, AccessLAN} {
+		dir := t.TempDir()
+		// The empty token makes the first Load rewrite the file, so the second
+		// Load reads back the access value as it was saved.
+		os.WriteFile(filepath.Join(dir, FileName), []byte(`{"version":1,"token":"","access":"`+v+`"}`), 0o600)
+		if _, _, err := Load(dir); err != nil {
+			t.Fatal(err)
+		}
+		c, _, err := Load(dir)
+		if err != nil || c.Access != v {
+			t.Fatalf("access %q: Load = %+v, %v", v, c, err)
+		}
+	}
+}
+
+func TestAccessIsOptional(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, FileName)
+	if _, _, err := Load(dir); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), `"access"`) {
+		t.Errorf("empty access written:\n%s", data)
+	}
+	content := `{"version":1,"token":"abc","host":"0.0.0.0","port":6270}`
+	os.WriteFile(path, []byte(content), 0o600)
+	c, _, err := Load(dir)
+	if err != nil || c.Access != "" {
+		t.Fatalf("Load = %+v, %v", c, err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != content {
+		t.Errorf("complete file rewritten:\n%s", data)
+	}
+}
+
+func TestAccessValidation(t *testing.T) {
+	for v, ok := range map[string]bool{
+		"":      true,
+		"lan":   true,
+		"local": true,
+		"bogus": false,
+		"LAN":   false,
+		"all":   false,
+	} {
+		if got := ValidAccess(v); got != ok {
+			t.Errorf("ValidAccess(%q) = %v, want %v", v, got, ok)
+		}
+	}
+}
+
+func TestInvalidAccessIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, FileName), []byte(`{"token":"abc","access":"bogus"}`), 0o600)
+	if _, _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "access") {
+		t.Fatalf("Load error = %v, want one naming the access field", err)
+	}
+}
