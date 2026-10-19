@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -222,6 +223,65 @@ func TestEmptyTokenIsReplacedOnStart(t *testing.T) {
 	if !strings.Contains(out.String(), "http://127.0.0.1:") || !strings.Contains(out.String(), cfg.Token) {
 		t.Errorf("banner does not use the configured host and new token:\n%s", out.String())
 	}
+}
+
+func TestAdvertiseHostLeadsTheBanner(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "rhyolite.json"), []byte(`{"version":1,"token":"tok","host":"127.0.0.1","port":6270,"advertise":"studio.lan"}`), 0o600)
+	out, stop := start(t, "--port", "0", dir)
+	defer stop()
+	if !regexp.MustCompile(`● Listening\n  on: http://studio\.lan:\d+/mcp\n  or: http://127\.0\.0\.1:\d+/mcp\n`).MatchString(out.String()) {
+		t.Errorf("listening lines:\n%s", out.String())
+	}
+	_, native := extractConfigs(t, out.String())
+	url := native["mcpServers"].(map[string]any)["rhyolite"].(map[string]any)["url"].(string)
+	if !strings.HasPrefix(url, "http://studio.lan:") {
+		t.Errorf("snippet url = %s", url)
+	}
+	// A local client resolves the name to loopback and sends it as Host, so
+	// the server must accept it on loopback.
+	port := strings.TrimSuffix(strings.TrimPrefix(url, "http://studio.lan:"), "/mcp")
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:"+port+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}`))
+	req.Host = "studio.lan:" + port
+	req.Header.Set("Authorization", "Bearer tok")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("advertised host on loopback: status %d", resp.StatusCode)
+	}
+}
+
+func TestInvalidAdvertiseIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "rhyolite.json"), []byte(`{"version":1,"token":"tok","advertise":"http://studio.lan"}`), 0o600)
+	err := run(context.Background(), []string{"--port", "0", dir}, &syncBuf{}, &syncBuf{})
+	if err == nil || !strings.Contains(err.Error(), "advertise") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// A .local name often resolves to IPv6 addresses too, so the default
+// listener must accept IPv6 clients as well as IPv4 ones.
+func TestDefaultHostAcceptsIPv6(t *testing.T) {
+	probe, err := net.Listen("tcp6", "[::1]:0")
+	if err != nil {
+		t.Skip("IPv6 unavailable:", err)
+	}
+	probe.Close()
+	dir := t.TempDir()
+	out, stop := start(t, "--port", "0", dir)
+	defer stop()
+	m := regexp.MustCompile(`:(\d+)/mcp`).FindStringSubmatch(out.String())
+	c, err := net.Dial("tcp6", net.JoinHostPort("::1", m[1]))
+	if err != nil {
+		t.Fatalf("IPv6 client refused: %v", err)
+	}
+	c.Close()
 }
 
 func TestDefaultsToCurrentFolder(t *testing.T) {
