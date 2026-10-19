@@ -18,7 +18,11 @@ type Options struct {
 	Token      string
 	Log        Logger // optional
 	Version    string
-	LocalNames []string // extra Host names accepted on loopback connections: the machine's own names
+	LocalNames []string // extra Host names the Host check accepts: the machine's own names
+	// LocalOnly is set when the listener is wrapped with LocalOnly, so that only
+	// connections from this machine arrive. The Host check then covers all
+	// connections, not only loopback ones. The caller does the wrapping.
+	LocalOnly bool
 }
 
 // New returns the HTTP handler: the MCP endpoint at /mcp behind Host and origin
@@ -44,7 +48,7 @@ func New(o Options) http.Handler {
 	})
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", mcpHandler)
-	return requestLog(log, hostGuard(o.LocalNames, originGuard(bearerAuth(o.Token, log, &clientTracker{}, limitBody(5<<20, mux)))))
+	return requestLog(log, hostGuard(o.LocalNames, o.LocalOnly, originGuard(bearerAuth(o.Token, log, &clientTracker{}, limitBody(5<<20, mux)))))
 }
 
 // toolCallLog logs each tool call: name, session, paths, outcome, duration.

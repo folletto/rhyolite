@@ -19,6 +19,7 @@ On start it creates (or reads) `rhyolite.json` in the folder, holding the access
 ● Listening
   on: http://Studio.local:6270/mcp
   or: http://192.168.1.20:6270/mcp
+› Access: local + LAN
 …
 ```
 
@@ -26,7 +27,9 @@ The first URL uses the machine's local (mDNS) name, which keeps working when the
 
 Two flavours are printed: one using [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) for clients that insist on HTTPS, and one for clients that speak HTTP directly (e.g. `claude mcp add --transport http`).
 
-Options: `--port N` overrides the port from `rhyolite.json` (default `6270`), `--verbosity none|basic|verbose` sets the terminal output (default `verbose`): `none` prints nothing, `basic` prints only the setup info (configuration and startup banner), `verbose` also echoes every log line. `rhyolite.log` is written in all modes. `--version` prints the version.
+Options: `--port N` overrides the port from `rhyolite.json` (default `6270`), `--access lan|local` overrides the `access` setting in `rhyolite.json` (default `lan`: this machine and the LAN; `local`: this machine only), `--verbosity none|basic|verbose` sets the terminal output (default `verbose`): `none` prints nothing, `basic` prints only the setup info (configuration and startup banner), `verbose` also echoes every log line. `rhyolite.log` is written in all modes. `--version` prints the version.
+
+The `"access"` key in `rhyolite.json` takes `lan` (the default) or `local` and applies to every run; the flag overrides it. The key is optional and not written by default. Both modes print the same URLs, so client configs never change when switching. After the URLs the banner states the mode: `› Access: local + LAN` or `› Access: local only`.
 
 To rotate the token, empty the `"token"` field in `rhyolite.json` and restart.
 
@@ -48,7 +51,7 @@ Only `.md` files and folders. Everything else (including `rhyolite.json` and `rh
 
 Concurrent edits: edits match against the file's current content, and a `notice` tells a client when its copy is stale. `expected_hash` makes any edit strict. Details in [specs/plan-pr-1.md](specs/plan-pr-1.md) §7.
 
-Security note: the server speaks plain HTTP, so on an untrusted network the bearer token can be sniffed. TLS is not implemented yet. Requests arriving over loopback are accepted only with a `Host` of `localhost`, a loopback IP, the machine's local name or the `advertise` host; other names are refused, which blocks DNS-rebinding attacks.
+Security note: the server speaks plain HTTP, so on an untrusted network the bearer token can be sniffed. TLS is not implemented yet. Requests arriving over loopback are accepted only with a `Host` of `localhost`, a loopback IP, the machine's local name or the `advertise` host; other names are refused, which blocks DNS-rebinding attacks. In `local` mode, other machines are refused when they connect, before any HTTP is read (each such IP is logged once as `refused`), and the `Host` check applies to every connection, not only loopback ones. A `Host` equal to the IP address a connection arrived on is also accepted, so the LAN-IP URL works on this machine. Containers and VMs on the same machine (Docker reaching the host through its bridge IP, for example) connect from a different address, so `local` mode refuses them.
 
 ## macOS app
 
@@ -85,11 +88,12 @@ Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space
 
 | `event` | Keys after `ts` and `event` |
 | --- | --- |
-| `start` | `version`, `vault`, `listen` |
+| `start` | `version`, `vault`, `listen`, `access` |
 | `stop` | none |
 | `http` | `method`, `path`, `status`, `dur_ms`, `ip` |
 | `client_new` | `ip`, `auth` (`ok` or `fail`: whether that first request had a valid token) |
 | `auth_fail` | `method`, `path`, `ip` |
+| `refused` | `ip` |
 | `tool` | `name`, `path` (when the tool takes one), `destination` (moves), `result` (`ok` or `error`), `dur_ms`, and `error` (only on failure; truncated to 200 characters) |
 
 `client_new` is logged once, just before the first `http`/`auth_fail` line from a client IP not seen since the server started (the set is kept in memory, so a restart announces everyone again, and it stops growing at 10,000 IPs). In a terminal that line is printed in bold; the log file never contains escape codes.

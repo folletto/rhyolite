@@ -96,6 +96,11 @@ func printBanner(w io.Writer, cfg *config.Config, port int) {
 		}
 		fmt.Fprintf(w, "  %s: %s\n", label, url(h))
 	}
+	access := "› Access: local + LAN"
+	if cfg.Access == config.AccessLocal {
+		access = "› Access: local only"
+	}
+	fmt.Fprintln(w, access)
 	fmt.Fprintln(w, "› Log: rhyolite.log")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "■ Config")
