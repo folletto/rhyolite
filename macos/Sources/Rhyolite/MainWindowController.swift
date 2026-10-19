@@ -8,15 +8,16 @@ final class MainWindowController: NSWindowController {
 
     init(model: AppModel) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Rhyolite"
         window.isReleasedWhenClosed = false
+        window.contentMinSize = NSSize(width: 600, height: 380)
         window.contentView = NSHostingView(rootView: MainView(model: model))
-        window.setContentSize(NSSize(width: 640, height: 480))
+        window.setContentSize(NSSize(width: 720, height: 480))
         let hadSavedFrame = UserDefaults.standard.object(forKey: "NSWindow Frame \(Self.frameName)") != nil
         window.setFrameAutosaveName(Self.frameName)
         if !hadSavedFrame { window.center() }
