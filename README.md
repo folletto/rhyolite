@@ -29,7 +29,7 @@ Two flavours are printed: one using [`mcp-remote`](https://www.npmjs.com/package
 
 Options: `--port N` overrides the port from `rhyolite.json` (default `6270`), `--access lan|local` overrides the `access` setting in `rhyolite.json` (default `lan`: this machine and the LAN; `local`: this machine only), `--verbosity none|basic|verbose` sets the terminal output (default `verbose`): `none` prints nothing, `basic` prints only the setup info (configuration and startup banner), `verbose` also echoes every log line. `rhyolite.log` is written in all modes. `--version` prints the version.
 
-The `"access"` key in `rhyolite.json` takes `lan` (the default) or `local` and applies to every run; the flag overrides it. The key is optional and not written by default. Both modes print the same URLs, so client configs never change when switching. After the URLs the banner states the mode: `› Access: local + LAN` or `› Access: local only`.
+The `"access"` key in `rhyolite.json` takes `lan` (the default) or `local` and applies to every run that doesn't pass `--access` (the macOS app always passes it, so the key never applies to app runs). The key is optional and not written by default. Both modes print the same URLs, so client configs never change when switching. After the URLs the banner states the mode: `› Access: local + LAN` or `› Access: local only`.
 
 To rotate the token, empty the `"token"` field in `rhyolite.json` and restart.
 
@@ -62,9 +62,12 @@ make app                      # -> bin/Rhyolite.app (macOS 14+, needs Xcode or t
 open bin/Rhyolite.app
 ```
 
-- **First launch** opens a window where you choose the vault folder.
-- **Later launches** open no window and start the server on the saved folder. If the folder is gone, or the server fails to start (for example, the port is taken), the window opens instead.
-- The window has a **Start / Stop** button (Start is disabled until the folder exists) and a live log of the CLI's output, including the `mcp.json` snippets with your token. The log is kept in memory only.
+- **First launch** opens the window, where you choose the vault folder on the **Vault** tab.
+- **Later launches** open no window and start the server on the saved folder. If the folder is gone, the window opens instead. If the server fails to start (for example, the port is taken), the window opens on the **Log** tab.
+- The window has a sidebar with three tabs:
+  - **Server**: the vault's name, a switch to turn the server on or off, with its status (the switch is disabled until the folder exists), and **Allow LAN connections** (on by default). Turning it off serves only this Mac (the CLI's `--access local`); changing it while the server runs restarts the server.
+  - **Vault**: the full folder path, **Change…** (only while the server is stopped) and **Reveal in Finder**.
+  - **Log**: a live log of the CLI's output, including the `mcp.json` snippets with your token. It follows new output while scrolled to the end and stays put when you scroll up. The log is kept in memory only; **Copy Log** copies it.
 - Closing the window keeps the app and server running. Click the Dock icon to reopen it. **Quit** (menu or ⌘Q) stops the server first: it sends the CLI the same signal as Ctrl+C and only forces it after a timeout.
 
 The build is ad-hoc signed, which is enough on the Mac that built it. An app downloaded from elsewhere is quarantined by Gatekeeper: right-click → Open, or run `xattr -dr com.apple.quarantine Rhyolite.app`. Developer ID signing and notarization aren't set up yet (`SIGN_IDENTITY` in `scripts/build.sh` is the hook for it).
