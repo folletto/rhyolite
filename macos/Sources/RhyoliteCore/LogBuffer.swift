@@ -39,6 +39,12 @@ public struct LogBuffer {
     public private(set) var lines: [String] = []
     /// Bumped on every change, so views can tell cheaply that something changed.
     public private(set) var revision = 0
+    /// Lines ever appended, including any trimmed away or cleared since. `lines` holds the last
+    /// `lines.count` of them unless the buffer was cleared. So a view that has shown the first T can
+    /// append `lines.suffix(totalAppended - T)` when that is at most `lines.count` and `clearCount` is unchanged.
+    public private(set) var totalAppended = 0
+    /// Bumped by `clear()`, so a view knows to rebuild rather than append.
+    public private(set) var clearCount = 0
     private let maxLines: Int
 
     public init(maxLines: Int = LogBuffer.defaultMaxLines) {
@@ -48,6 +54,7 @@ public struct LogBuffer {
     public mutating func append(_ newLines: [String]) {
         guard !newLines.isEmpty else { return }
         lines.append(contentsOf: newLines)
+        totalAppended += newLines.count
         if lines.count > maxLines {
             lines.removeFirst(lines.count - maxLines)
         }
@@ -56,6 +63,7 @@ public struct LogBuffer {
 
     public mutating func clear() {
         lines.removeAll()
+        clearCount += 1
         revision += 1
     }
 

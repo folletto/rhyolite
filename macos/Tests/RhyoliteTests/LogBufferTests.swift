@@ -36,6 +36,29 @@ final class LogBufferTests: XCTestCase {
         XCTAssertEqual(b.lines, ["3", "4", "5"])
     }
 
+    func testTotalAppendedCountsLinesEvenWhenTrimmed() {
+        var b = LogBuffer(maxLines: 3)
+        b.append(["1", "2"])
+        XCTAssertEqual(b.totalAppended, 2)
+        b.append([])
+        XCTAssertEqual(b.totalAppended, 2)
+        b.append(["3", "4", "5"])
+        XCTAssertEqual(b.lines.count, 3)
+        XCTAssertEqual(b.totalAppended, 5)
+    }
+
+    func testClearKeepsTotalAppendedAndCountsClears() {
+        var b = LogBuffer(maxLines: 3)
+        b.append(["1", "2", "3", "4"])
+        XCTAssertEqual(b.clearCount, 0)
+        b.clear()
+        XCTAssertEqual(b.clearCount, 1)
+        XCTAssertEqual(b.totalAppended, 4)
+        b.append(["5"])
+        XCTAssertEqual(b.totalAppended, 5)
+        XCTAssertEqual(b.clearCount, 1)
+    }
+
     func testRevisionChangesOnlyWhenContentChanges() {
         var b = LogBuffer()
         let r0 = b.revision
