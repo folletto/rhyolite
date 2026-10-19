@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -45,7 +47,7 @@ type env struct {
 	log *memLog
 }
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T, localNames ...string) *env {
 	t.Helper()
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
 	v, err := vault.Open(dir, trash.Func(func(p string) error { return os.RemoveAll(p) }))
@@ -54,7 +56,7 @@ func newEnv(t *testing.T) *env {
 	}
 	t.Cleanup(func() { v.Close() })
 	lg := &memLog{}
-	ts := httptest.NewServer(New(Options{Vault: v, Token: testToken, Log: lg, Version: "test"}))
+	ts := httptest.NewServer(New(Options{Vault: v, Token: testToken, Log: lg, Version: "test", LocalNames: localNames}))
 	t.Cleanup(ts.Close)
 	return &env{t: t, dir: dir, ts: ts, log: lg}
 }
@@ -303,9 +305,12 @@ func TestConcurrentClientsDoNotCorruptFiles(t *testing.T) {
 	}
 }
 
+// initializeBody is an MCP initialize request.
+const initializeBody = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"x","version":"1"}}}`
+
 func rawRequest(t *testing.T, e *env, hdr map[string]string) *http.Response {
 	t.Helper()
-	req, _ := http.NewRequest("POST", e.ts.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"x","version":"1"}}}`))
+	req, _ := http.NewRequest("POST", e.ts.URL+"/mcp", strings.NewReader(initializeBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	for k, v := range hdr {
@@ -379,6 +384,82 @@ func TestOriginGuard(t *testing.T) {
 	for origin, want := range cases {
 		if got := rawRequest(t, e, map[string]string{"Authorization": auth, "Origin": origin}).StatusCode; got != want {
 			t.Errorf("Origin %q: %d, want %d", origin, got, want)
+		}
+	}
+}
+
+func TestHostGuard(t *testing.T) {
+	loopback := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 6270}
+	loopback6 := &net.TCPAddr{IP: net.IPv6loopback, Port: 6270}
+	lan := &net.TCPAddr{IP: net.ParseIP("192.168.1.20"), Port: 6270}
+	cases := []struct {
+		name  string
+		names []string
+		local net.Addr // nil: no local address in the request context
+		host  string
+		want  int
+	}{
+		{"localhost", nil, loopback, "localhost:6270", 200},
+		{"localhost in any case", nil, loopback, "LocalHost:6270", 200},
+		{"IPv4 loopback", nil, loopback, "127.0.0.1:6270", 200},
+		{"IPv6 loopback", nil, loopback6, "[::1]:6270", 200},
+		{"IPv4 loopback without port", nil, loopback, "127.0.0.1", 200},
+		{"IPv6 loopback without port", nil, loopback6, "[::1]", 200},
+		{"local name", []string{"wombat.local"}, loopback, "wombat.local:6270", 200},
+		{"local name in any case", []string{"wombat.local"}, loopback, "WOMBAT.local:6270", 200},
+		{"local name with trailing dot", []string{"wombat.local"}, loopback, "wombat.local.:6270", 200},
+		{"configured name with trailing dot", []string{"wombat.local."}, loopback, "wombat.local:6270", 200},
+		{"advertised IP", []string{"192.168.1.20"}, loopback, "192.168.1.20:6270", 200},
+		{"local name not configured", nil, loopback, "wombat.local:6270", 403},
+		{"other name", []string{"wombat.local"}, loopback, "evil.example:6270", 403},
+		{"name containing a configured one", []string{"wombat.local"}, loopback, "wombat.local.evil.example:6270", 403},
+		{"empty configured name ignored", []string{""}, loopback, "evil.example:6270", 403},
+		{"empty Host", []string{""}, loopback, "", 403},
+		{"LAN connection passes", nil, lan, "evil.example:6270", 200},
+		{"no local address passes", nil, nil, "evil.example:6270", 200},
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest("POST", "/mcp", nil)
+		req.Host = c.host
+		if c.local != nil {
+			req = req.WithContext(context.WithValue(req.Context(), http.LocalAddrContextKey, c.local))
+		}
+		rec := httptest.NewRecorder()
+		hostGuard(c.names, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })).ServeHTTP(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("%s (Host %q): status %d, want %d", c.name, c.host, rec.Code, c.want)
+		}
+		if c.want == 403 && !strings.Contains(rec.Body.String(), "Forbidden: invalid Host header") {
+			t.Errorf("%s: body %q", c.name, rec.Body.String())
+		}
+	}
+}
+
+// The SDK's own Host check is off, so the machine's name has to come from
+// LocalNames: over real loopback HTTP that name works and other names do not.
+func TestHostGuardOverHTTP(t *testing.T) {
+	e := newEnv(t, "wombat.local")
+	port := e.ts.Listener.Addr().(*net.TCPAddr).Port
+	for _, c := range []struct {
+		host string
+		want int
+	}{
+		{"wombat.local", 200},
+		{"localhost", 200},
+		{"evil.example", 403},
+	} {
+		req, _ := http.NewRequest("POST", e.ts.URL+"/mcp", strings.NewReader(initializeBody))
+		req.Host = fmt.Sprintf("%s:%d", c.host, port)
+		req.Header.Set("Authorization", "Bearer "+testToken)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != c.want {
+			t.Errorf("Host %q: status %d, want %d", req.Host, resp.StatusCode, c.want)
 		}
 	}
 }

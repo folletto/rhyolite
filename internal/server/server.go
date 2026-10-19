@@ -14,13 +14,14 @@ import (
 
 // Options configure New.
 type Options struct {
-	Vault   *vault.Vault
-	Token   string
-	Log     Logger // optional
-	Version string
+	Vault      *vault.Vault
+	Token      string
+	Log        Logger // optional
+	Version    string
+	LocalNames []string // extra Host names accepted on loopback connections: the machine's own names
 }
 
-// New returns the HTTP handler: the MCP endpoint at /mcp behind origin
+// New returns the HTTP handler: the MCP endpoint at /mcp behind Host and origin
 // checks, bearer-token authentication and request logging.
 func New(o Options) http.Handler {
 	log := o.Log
@@ -38,10 +39,12 @@ func New(o Options) http.Handler {
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, &mcp.StreamableHTTPOptions{
 		SessionTimeout:      time.Hour,
 		MaxRequestBodyBytes: 4 << 20,
+		// hostGuard does the SDK's Host check, and also accepts LocalNames.
+		DisableLocalhostProtection: true,
 	})
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", mcpHandler)
-	return requestLog(log, originGuard(bearerAuth(o.Token, log, &clientTracker{}, limitBody(5<<20, mux))))
+	return requestLog(log, hostGuard(o.LocalNames, originGuard(bearerAuth(o.Token, log, &clientTracker{}, limitBody(5<<20, mux)))))
 }
 
 // toolCallLog logs each tool call: name, session, paths, outcome, duration.

@@ -71,3 +71,11 @@ A `.local` name often resolves to the Mac's IPv6 addresses as well as IPv4. No l
 
 - `README.md`: the quick-start banner shows the local name; a short paragraph says where the name comes from, that IPs remain as fallbacks (guest Wi-Fi and networks with client isolation block mDNS), that macOS may rename the machine to `Name-2.local` on a conflict, and how to use `"advertise"`.
 - `AGENTS.md`: no change needed.
+
+## 8. Host check on loopback (done)
+
+On the Mac that runs the server, its own `.local` name resolves to loopback (`::1` or `127.0.0.1`) first. A local client using the printed URL therefore connects over loopback while sending `Host: Studio.local:6270`. The MCP SDK's DNS-rebinding check refuses every loopback request whose Host is not `localhost` or a loopback IP, so the advertised URL returned 403 on the machine that served it.
+
+The SDK's check is turned off (`DisableLocalhostProtection`). `hostGuard` in `internal/server/middleware.go` does the same check and also accepts `Options.LocalNames`, which `cmd/rhyolite` fills with the local name and the `advertise` host. Host names are compared case-insensitively, ignoring the port, IPv6 brackets and a trailing dot. Connections on other addresses pass unchanged. The guard runs before bearer authentication, as the origin check does, so an unauthenticated request with a refused Host gets 403 rather than 401.
+
+Tests: `TestHostGuard` covers the Host forms on loopback and on a LAN connection; `TestHostGuardOverHTTP` initializes a session over real HTTP with the local name as Host; `TestAdvertiseHostLeadsTheBanner` checks that the advertised host works on loopback.

@@ -238,6 +238,22 @@ func TestAdvertiseHostLeadsTheBanner(t *testing.T) {
 	if !strings.HasPrefix(url, "http://studio.lan:") {
 		t.Errorf("snippet url = %s", url)
 	}
+	// A local client resolves the name to loopback and sends it as Host, so
+	// the server must accept it on loopback.
+	port := strings.TrimSuffix(strings.TrimPrefix(url, "http://studio.lan:"), "/mcp")
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:"+port+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}`))
+	req.Host = "studio.lan:" + port
+	req.Header.Set("Authorization", "Bearer tok")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("advertised host on loopback: status %d", resp.StatusCode)
+	}
 }
 
 func TestInvalidAdvertiseIsAnError(t *testing.T) {

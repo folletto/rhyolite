@@ -48,7 +48,7 @@ Only `.md` files and folders. Everything else (including `rhyolite.json` and `rh
 
 Concurrent edits: edits match against the file's current content, and a `notice` tells a client when its copy is stale. `expected_hash` makes any edit strict. Details in [specs/plan-pr-1.md](specs/plan-pr-1.md) §7.
 
-Security note: the server speaks plain HTTP, so on an untrusted network the bearer token can be sniffed. TLS is not implemented yet.
+Security note: the server speaks plain HTTP, so on an untrusted network the bearer token can be sniffed. TLS is not implemented yet. Requests arriving over loopback are accepted only with a `Host` of `localhost`, a loopback IP, the machine's local name or the `advertise` host; other names are refused, which blocks DNS-rebinding attacks.
 
 ## macOS app
 

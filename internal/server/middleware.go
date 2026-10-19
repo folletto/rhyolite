@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -68,6 +69,50 @@ func (c *clientTracker) isNew(ip string) bool {
 	}
 	c.seen[ip] = struct{}{}
 	return true
+}
+
+// hostGuard is the DNS-rebinding protection for connections that arrive over
+// loopback, in place of the MCP SDK's check. The SDK accepts only localhost and
+// loopback IPs as Host, which also refuses the machine's own name. On a Mac,
+// "wombat.local" resolves to loopback, so a local client sends that name as
+// Host: the names given (the machine's own names) are accepted too.
+// Connections on other addresses pass unchanged.
+func hostGuard(names []string, next http.Handler) http.Handler {
+	allowed := map[string]bool{}
+	for _, n := range names {
+		if h := hostKey(n); h != "" {
+			allowed[h] = true
+		}
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if local, _ := r.Context().Value(http.LocalAddrContextKey).(*net.TCPAddr); local != nil && local.IP.IsLoopback() {
+			h := hostKey(r.Host)
+			if !allowed[h] && !loopbackHost(h) {
+				http.Error(w, fmt.Sprintf("Forbidden: invalid Host header %q", r.Host), http.StatusForbidden)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// hostKey returns the host of a Host header value or of a configured name, in
+// lower case, without the port, IPv6 brackets or a trailing dot.
+func hostKey(hostport string) string {
+	h, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		h = hostport
+	}
+	return strings.ToLower(strings.TrimSuffix(strings.Trim(h, "[]"), "."))
+}
+
+// loopbackHost reports whether a hostKey is localhost or a loopback IP.
+func loopbackHost(h string) bool {
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
 }
 
 // originGuard blocks browser requests from web pages: a request carrying an

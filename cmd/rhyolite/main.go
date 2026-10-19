@@ -111,7 +111,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	actual := ln.Addr().(*net.TCPAddr).Port
 
 	srv := &http.Server{
-		Handler:           server.New(server.Options{Vault: v, Token: cfg.Token, Log: logw, Version: version}),
+		Handler: server.New(server.Options{
+			Vault:      v,
+			Token:      cfg.Token,
+			Log:        logw,
+			Version:    version,
+			LocalNames: []string{localName(), cfg.Advertise},
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 		ErrorLog:          nil,
