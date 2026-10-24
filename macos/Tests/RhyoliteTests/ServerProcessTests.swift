@@ -71,6 +71,17 @@ final class ServerProcessTests: XCTestCase {
         XCTAssertTrue(log.contains("■ Stopping"), "the CLI's shutdown output is kept")
     }
 
+    func testOnLinesReceivesEachBatchAsItIsLogged() async throws {
+        let server = ServerProcess(executableURL: try script(wellBehaved), timeouts: fast)
+        var batches: [[String]] = []
+        server.onLines = { batches.append($0) }
+        server.start(vaultPath: vault.path)
+        try await waitFor("running") { server.state == .running }
+        XCTAssertEqual(batches.flatMap { $0 }, server.log.lines)
+        XCTAssertTrue(batches.flatMap { $0 }.contains("● Listening"))
+        await server.stop()
+    }
+
     /// The arguments the fake CLI was started with, as `wellBehaved` echoed them.
     private func argumentsSeen(_ server: ServerProcess) -> [String] {
         server.log.lines.filter { $0.hasPrefix("arg=") }.map { String($0.dropFirst("arg=".count)) }

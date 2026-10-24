@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The window's content: a fixed sidebar of tabs that can't be collapsed, with the selected tab's page beside it.
-/// The window's header shows the tab's name, with the vault's name below it.
+/// The window's header shows the tab's name, with the vault's name and the server's status below it.
 struct MainView: View {
     let model: AppModel
 
@@ -15,13 +15,14 @@ struct MainView: View {
         } detail: {
             Group {
                 switch model.selectedTab {
+                case .clients: ClientsTab(model: model)
                 case .server: ServerTab(model: model)
                 case .vault: VaultTab(model: model)
                 case .log: LogTab(model: model)
                 }
             }
             .navigationTitle(model.selectedTab.title)
-            .navigationSubtitle(model.vaultName.isEmpty ? "No vault" : model.vaultName)
+            .navigationSubtitle("\(model.vaultName.isEmpty ? "No vault" : model.vaultName) · \(model.statusText)")
         }
     }
 

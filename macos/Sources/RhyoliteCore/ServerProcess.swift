@@ -46,6 +46,8 @@ public final class ServerProcess {
 
     /// Called after every state change.
     @ObservationIgnored public var onStateChange: ((ServerState) -> Void)?
+    /// Called with each batch of output lines, after they are added to the log.
+    @ObservationIgnored public var onLines: (([String]) -> Void)?
 
     @ObservationIgnored private let executableURL: URL
     @ObservationIgnored private let timeouts: StopTimeouts
@@ -161,6 +163,7 @@ public final class ServerProcess {
         if state == .starting, lines.contains(where: { $0.contains(Self.readyMarker) }) {
             setState(.running)
         }
+        onLines?(lines)
     }
 
     private func processExited(id: Int, status: Int32, signaled: Bool) {

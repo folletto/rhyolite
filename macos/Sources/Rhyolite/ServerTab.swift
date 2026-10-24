@@ -17,7 +17,7 @@ struct ServerTab: View {
                             Circle()
                                 .fill(statusColor)
                                 .frame(width: 10, height: 10)
-                            Text(statusText)
+                            Text(model.statusText)
                         }
                     }
                 } footer: {
@@ -72,16 +72,6 @@ struct ServerTab: View {
         model.allowLAN
             ? "Other devices on your network can connect."
             : "Only apps on this Mac can connect."
-    }
-
-    private var statusText: String {
-        switch model.server.state {
-        case .stopped: "Stopped"
-        case .starting: "Starting…"
-        case .running: "Running"
-        case .stopping: "Stopping…"
-        case .failed(let why): "Failed (\(why))"
-        }
     }
 
     private var statusColor: Color {

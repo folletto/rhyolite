@@ -64,7 +64,8 @@ open bin/Rhyolite.app
 
 - **First launch** opens the window, where you choose the vault folder on the **Vault** tab.
 - **Later launches** open no window and start the server on the saved folder. If the folder is gone, the window opens instead. If the server fails to start (for example, the port is taken), the window opens on the **Log** tab.
-- The window has a sidebar with three tabs (the window's header shows the selected tab's name, with the vault's name below it):
+- The window has a sidebar with four tabs (the window's header shows the selected tab's name, with the vault's name and the server's status below it):
+  - **Clients**: every app that has used the server since the app launched, newest first: one row each with its name (as the app reports it) and IP, its last connection and, below it, its first. An app on two machines shows twice. Failed attempts are listed per IP with their count, since a refused request doesn't say which app sent it. The list survives server restarts but not quitting the app. **Clear List** empties it; an app that is still connected comes back on its next request.
   - **Server**: a switch to turn the server on or off, with its status (the switch is disabled until the folder exists), and **Allow LAN connections** (on by default). Turning it off serves only this Mac (the CLI's `--access local`); changing it while the server runs restarts the server.
   - **Vault**: the full folder path with **Change…** (only while the server is stopped), and **Show in Finder** with **Reveal**.
   - **Log**: a live log of the CLI's output, including the `mcp.json` snippets with your token. It follows new output while scrolled to the end and stays put when you scroll up. The log is kept in memory only; **Copy Log** copies it.
