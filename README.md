@@ -2,6 +2,9 @@
 
 Shared access storage for data: a single-binary MCP server that exposes a folder of Markdown files (a "vault") to MCP clients over HTTP, so laptops on the same network can read and edit the same notes.
 
+<img width="1504" height="1248" alt="rhyolite-pre-1" src="https://github.com/user-attachments/assets/ab27d2d5-18c9-4253-b8b0-fd40ac41bd04" />
+
+
 ## Quick start
 
 ```sh
