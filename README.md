@@ -9,6 +9,13 @@ Contains:
 <img width="1504" height="1248" alt="rhyolite-pre-server-1" src="https://github.com/user-attachments/assets/3e9bfdbe-e9b1-45c5-9ff6-2b61ab0d4bbe" />
 
 
+## Why
+
+The idea is to have an always-on MCP that can be accessed locally (or via LAN) that gives access to a folder. The MCP tools exposed are as close as possible to the same tools that LLMs use to read/write files, aiming to be analogous as navigating a file system. 
+
+This can also be pointed to an Obsidian folder, allowing live edit of the same set of files.
+
+
 
 ## Quick start
 
