@@ -154,6 +154,10 @@ func localOrigin(origin string) bool {
 	return ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast())
 }
 
+// clientIPHeader carries the connection's IP from requestLog to the MCP layer, which only sees headers.
+// requestLog always overwrites it, so a client cannot set it.
+const clientIPHeader = "X-Rhyolite-Client-Ip"
+
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -178,13 +182,23 @@ func (s *statusWriter) Flush() {
 
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
-// requestLog writes one line per HTTP request.
+// requestLog writes one line per HTTP request. The line carries the MCP session id when the request belongs to one.
 func requestLog(log Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: 200}
+		r.Header.Set(clientIPHeader, clientIP(r))
 		next.ServeHTTP(sw, r)
-		log.Log("http", "method", r.Method, "path", r.URL.Path, "status", sw.status, "dur_ms", time.Since(start), "ip", clientIP(r))
+		// The server sets the session id on the response to initialize; later requests carry it in the request.
+		session := sw.Header().Get("Mcp-Session-Id")
+		if session == "" {
+			session = r.Header.Get("Mcp-Session-Id")
+		}
+		kv := []any{"method", r.Method, "path", r.URL.Path, "status", sw.status, "dur_ms", time.Since(start), "ip", clientIP(r)}
+		if session != "" {
+			kv = append(kv, "session", session)
+		}
+		log.Log("http", kv...)
 	})
 }
 

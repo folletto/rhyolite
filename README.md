@@ -93,8 +93,9 @@ Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space
 | --- | --- |
 | `start` | `version`, `vault`, `listen`, `access` |
 | `stop` | none |
-| `http` | `method`, `path`, `status`, `dur_ms`, `ip` |
+| `http` | `method`, `path`, `status`, `dur_ms`, `ip`, `session` (the MCP session id; only when the request belongs to a session) |
 | `client_new` | `ip`, `auth` (`ok` or `fail`: whether that first request had a valid token) |
+| `client_init` | `ip`, `session`, `name`, `version` (the client app's own name and version, as it reports them when it opens an MCP session) |
 | `auth_fail` | `method`, `path`, `ip` |
 | `refused` | `ip` |
 | `tool` | `name`, `path` (when the tool takes one), `destination` (moves), `result` (`ok` or `error`), `dur_ms`, and `error` (only on failure; truncated to 200 characters) |
@@ -103,6 +104,7 @@ Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space
 
 ```
 ts=2026-09-30T12:00:00+02:00 event=client_new ip=192.168.1.20 auth=ok
-ts=2026-09-30T12:00:00+02:00 event=http method=POST path=/mcp status=200 dur_ms=12 ip=192.168.1.20
+ts=2026-09-30T12:00:00+02:00 event=client_init ip=192.168.1.20 session=XK3V7Q2M name=claude-ai version=0.1.0
+ts=2026-09-30T12:00:00+02:00 event=http method=POST path=/mcp status=200 dur_ms=12 ip=192.168.1.20 session=XK3V7Q2M
 ts=2026-09-30T12:00:00+02:00 event=tool name=file_read path="my notes/a.md" result=ok dur_ms=1
 ```
