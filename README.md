@@ -6,7 +6,8 @@ Contains:
 * `rhyolite` CLI binary
 * Rhyolite MacOS app (UI for the CLI)
 
-<img width="1504" height="1248" alt="rhyolite-pre-server-1" src="https://github.com/user-attachments/assets/3e9bfdbe-e9b1-45c5-9ff6-2b61ab0d4bbe" />
+<img width="1504" height="1248" alt="rhyolite-20261024" src="https://github.com/user-attachments/assets/a98dc7fd-016a-4f1f-9755-ac51df98e497" />
+
 
 
 ## Why
@@ -15,6 +16,7 @@ The idea is to have an always-on MCP that can be accessed locally (or via LAN) t
 
 This can also be pointed to an Obsidian folder, allowing live edit of the same set of files.
 
+No tracking, no analytics. It's all in your control.
 
 
 ## Quick start
