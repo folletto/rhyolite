@@ -66,7 +66,7 @@ open bin/Rhyolite.app
 - **Later launches** open no window and start the server on the saved folder. If the folder is gone, the window opens instead. If the server fails to start (for example, the port is taken), the window opens on the **Log** tab.
 - The window has a sidebar with three tabs (the window's header shows the selected tab's name, with the vault's name below it):
   - **Server**: a switch to turn the server on or off, with its status (the switch is disabled until the folder exists), and **Allow LAN connections** (on by default). Turning it off serves only this Mac (the CLI's `--access local`); changing it while the server runs restarts the server.
-  - **Vault**: the full folder path, **Change…** (only while the server is stopped) and **Reveal in Finder**.
+  - **Vault**: the full folder path with **Change…** (only while the server is stopped), and **Show in Finder** with **Reveal**.
   - **Log**: a live log of the CLI's output, including the `mcp.json` snippets with your token. It follows new output while scrolled to the end and stays put when you scroll up. The log is kept in memory only; **Copy Log** copies it.
 - Closing the window keeps the app and server running. Click the Dock icon to reopen it. **Quit** (menu or ⌘Q) stops the server first: it sends the CLI the same signal as Ctrl+C and only forces it after a timeout.
 
