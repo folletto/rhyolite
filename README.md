@@ -64,9 +64,10 @@ open bin/Rhyolite.app
 
 - **First launch** opens the window, where you choose the vault folder on the **Vault** tab.
 - **Later launches** open no window and start the server on the saved folder. If the folder is gone, the window opens instead. If the server fails to start (for example, the port is taken), the window opens on the **Log** tab.
-- The window has a sidebar with three tabs:
-  - **Server**: the vault's name, a switch to turn the server on or off, with its status (the switch is disabled until the folder exists), and **Allow LAN connections** (on by default). Turning it off serves only this Mac (the CLI's `--access local`); changing it while the server runs restarts the server.
-  - **Vault**: the full folder path, **Change…** (only while the server is stopped) and **Reveal in Finder**.
+- The window has a sidebar with four tabs (the window's header shows the selected tab's name, with the vault's name and the server's status below it):
+  - **Clients**: every app that has used the server since the app launched, newest first: one row each with its name (as the app reports it) and IP, its last connection and, below it, its first. An app on two machines shows twice. Failed attempts are listed per IP with their count, since a refused request doesn't say which app sent it. The list survives server restarts but not quitting the app. **Clear List** empties it; an app that is still connected comes back on its next request.
+  - **Server**: a switch to turn the server on or off, with its status (the switch is disabled until the folder exists), and **Allow LAN connections** (on by default). Turning it off serves only this Mac (the CLI's `--access local`); changing it while the server runs restarts the server.
+  - **Vault**: the full folder path with **Change…** (only while the server is stopped), and **Show in Finder** with **Reveal**.
   - **Log**: a live log of the CLI's output, including the `mcp.json` snippets with your token. It follows new output while scrolled to the end and stays put when you scroll up. The log is kept in memory only; **Copy Log** copies it.
 - Closing the window keeps the app and server running. Click the Dock icon to reopen it. **Quit** (menu or ⌘Q) stops the server first: it sends the CLI the same signal as Ctrl+C and only forces it after a timeout.
 
@@ -93,8 +94,9 @@ Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space
 | --- | --- |
 | `start` | `version`, `vault`, `listen`, `access` |
 | `stop` | none |
-| `http` | `method`, `path`, `status`, `dur_ms`, `ip` |
+| `http` | `method`, `path`, `status`, `dur_ms`, `ip`, `session` (the MCP session id; only when the request belongs to a session) |
 | `client_new` | `ip`, `auth` (`ok` or `fail`: whether that first request had a valid token) |
+| `client_init` | `ip`, `session`, `name`, `version` (the client app's own name and version, as it reports them when it opens an MCP session) |
 | `auth_fail` | `method`, `path`, `ip` |
 | `refused` | `ip` |
 | `tool` | `name`, `path` (when the tool takes one), `destination` (moves), `result` (`ok` or `error`), `dur_ms`, and `error` (only on failure; truncated to 200 characters) |
@@ -103,6 +105,7 @@ Each log line is [logfmt](https://brandur.org/logfmt): one event per line, space
 
 ```
 ts=2026-09-30T12:00:00+02:00 event=client_new ip=192.168.1.20 auth=ok
-ts=2026-09-30T12:00:00+02:00 event=http method=POST path=/mcp status=200 dur_ms=12 ip=192.168.1.20
+ts=2026-09-30T12:00:00+02:00 event=client_init ip=192.168.1.20 session=XK3V7Q2M name=claude-ai version=0.1.0
+ts=2026-09-30T12:00:00+02:00 event=http method=POST path=/mcp status=200 dur_ms=12 ip=192.168.1.20 session=XK3V7Q2M
 ts=2026-09-30T12:00:00+02:00 event=tool name=file_read path="my notes/a.md" result=ok dur_ms=1
 ```

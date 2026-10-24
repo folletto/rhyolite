@@ -1,33 +1,35 @@
 import SwiftUI
 
-/// The Vault tab: the chosen folder, with buttons to change it and to show it in Finder.
+/// The Vault tab: the chosen folder with a button to change it, and a button to show it in Finder.
 struct VaultTab: View {
     let model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Vault folder")
-                .font(.headline)
-            HStack(spacing: 8) {
-                Text(model.vaultPath.isEmpty ? "No folder chosen" : model.vaultPath)
-                    .foregroundStyle(model.vaultPath.isEmpty ? .secondary : .primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
-                Button("Change…") { model.chooseFolder() }
-                    .disabled(!model.canChangeFolder)
+        VStack(alignment: .leading, spacing: 16) {
+            Form {
+                Section {
+                    LabeledContent {
+                        Button("Change…") { model.chooseFolder() }
+                            .disabled(!model.canChangeFolder)
+                    } label: {
+                        Text("Folder")
+                        Text(model.vaultPath.isEmpty ? "No folder chosen" : model.vaultPath)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                    }
+                    LabeledContent("Show in Finder") {
+                        Button("Reveal") { model.revealVault() }
+                            .disabled(!model.isConfigured)
+                    }
+                } footer: {
+                    if let hint = folderHint {
+                        Text(hint.text)
+                            .foregroundStyle(hint.isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    }
+                }
             }
-            if let hint = folderHint {
-                Text(hint.text)
-                    .font(.caption)
-                    .foregroundStyle(hint.isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-            }
-            Button("Reveal in Finder") { model.revealVault() }
-                .disabled(!model.isConfigured)
+            .formStyle(.grouped)
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

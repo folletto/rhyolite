@@ -18,6 +18,8 @@ final class AppModel {
     /// True while a running server is stopped and started again to apply a changed `allowLAN`.
     private(set) var isRestarting = false
     let server: ServerProcess
+    /// Apps that have used the server since the app launched, newest first. Kept across server restarts, never saved.
+    private(set) var clients = ClientList()
 
     @ObservationIgnored private let settings: Settings
     @ObservationIgnored private let defaults: UserDefaults
@@ -34,6 +36,7 @@ final class AppModel {
         allowLAN = settings.allowLAN
         cliURL = Self.locateCLI()
         server = ServerProcess(executableURL: cliURL, defaults: defaults)
+        server.onLines = { [weak self] lines in self?.clients.consume(lines) }
     }
 
     /// The CLI embedded in the app bundle. `RHYOLITE_CLI` overrides it, for
@@ -51,7 +54,7 @@ final class AppModel {
         isConfigured = settings.isConfigured
     }
 
-    /// The vault folder's name, which is the Server tab's title. Empty when no folder is chosen.
+    /// The vault folder's name, shown as the window's subtitle. Empty when no folder is chosen.
     var vaultName: String {
         vaultPath.isEmpty ? "" : URL(fileURLWithPath: vaultPath).lastPathComponent
     }
@@ -63,6 +66,17 @@ final class AppModel {
         switch server.state {
         case .starting, .running: true
         case .stopped, .stopping, .failed: false
+        }
+    }
+
+    /// The server's status in words, as shown on the Server tab and in the window's subtitle.
+    var statusText: String {
+        switch server.state {
+        case .stopped: "Stopped"
+        case .starting: "Starting…"
+        case .running: "Running"
+        case .stopping: "Stopping…"
+        case .failed(let why): "Failed (\(why))"
         }
     }
 
@@ -123,6 +137,9 @@ final class AppModel {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(server.log.text, forType: .string)
     }
+
+    /// Empties the Clients list.
+    func clearClients() { clients.clear() }
 
     /// Stops a CLI left behind by a previous crash of the app.
     func reapOrphan() async {

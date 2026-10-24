@@ -39,6 +39,7 @@ func New(o Options) http.Handler {
 	s := mcp.NewServer(&mcp.Implementation{Name: "rhyolite", Title: "Rhyolite", Version: version}, &mcp.ServerOptions{Instructions: instructions})
 	registerTools(s, o.Vault)
 	s.AddReceivingMiddleware(toolCallLog(log))
+	s.AddReceivingMiddleware(clientInitLog(log))
 
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, &mcp.StreamableHTTPOptions{
 		SessionTimeout:      time.Hour,
@@ -89,6 +90,34 @@ func toolCallLog(log Logger) mcp.Middleware {
 				kv = append(kv, "error", errText)
 			}
 			log.Log("tool", kv...)
+			return res, err
+		}
+	}
+}
+
+// clientInitLog logs each MCP session's start: the connection's IP, the session id and the client app's name and version.
+func clientInitLog(log Logger) mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if method != "initialize" {
+				return next(ctx, method, req)
+			}
+			res, err := next(ctx, method, req)
+			// The server receives initialize as a ServerRequest (mcp.InitializeRequest is the client-side type).
+			if r, ok := req.(*mcp.ServerRequest[*mcp.InitializeParams]); ok && err == nil && r.Params != nil {
+				ip, session := "", ""
+				if extra := req.GetExtra(); extra != nil && extra.Header != nil {
+					ip = extra.Header.Get(clientIPHeader)
+				}
+				if s := req.GetSession(); s != nil {
+					session = s.ID()
+				}
+				name, version := "", ""
+				if info := r.Params.ClientInfo; info != nil {
+					name, version = info.Name, info.Version
+				}
+				log.Log("client_init", "ip", ip, "session", session, "name", name, "version", version)
+			}
 			return res, err
 		}
 	}

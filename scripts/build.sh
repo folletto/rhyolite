@@ -48,7 +48,8 @@ build_app() {
 	plutil -replace CFBundleShortVersionString -string "${short:-0.0.0}" "$plist"
 	plutil -replace CFBundleVersion -string "$VERSION" "$plist"
 	if [ -f macos/Resources/AppIcon.icns ]; then
-		cp macos/Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+		# -X drops extended attributes (Finder info, resource fork), which codesign rejects.
+		cp -X macos/Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 	fi
 
 	# Sign inside-out. Ad-hoc by default; SIGN_IDENTITY="Developer ID Application: ..." overrides.
