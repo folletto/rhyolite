@@ -16,7 +16,13 @@ final class MainWindowController: NSWindowController {
         window.title = "Rhyolite"
         window.isReleasedWhenClosed = false
         window.contentMinSize = NSSize(width: 600, height: 380)
-        window.contentView = NSHostingView(rootView: MainView(model: model))
+        // An explicit toolbar gives the window the tall unified header, with the sidebar running full height
+        // beside it. SwiftUI fills in the header's title and subtitle from the tabs.
+        window.toolbar = NSToolbar(identifier: "RhyoliteMainToolbar")
+        window.toolbarStyle = .unified
+        let hostingView = NSHostingView(rootView: MainView(model: model))
+        hostingView.sceneBridgingOptions = [.title, .toolbars]
+        window.contentView = hostingView
         window.setContentSize(NSSize(width: 720, height: 480))
         let hadSavedFrame = UserDefaults.standard.object(forKey: "NSWindow Frame \(Self.frameName)") != nil
         window.setFrameAutosaveName(Self.frameName)

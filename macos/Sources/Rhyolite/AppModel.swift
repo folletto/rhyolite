@@ -51,7 +51,7 @@ final class AppModel {
         isConfigured = settings.isConfigured
     }
 
-    /// The vault folder's name, which is the Server tab's title. Empty when no folder is chosen.
+    /// The vault folder's name, shown as the window's subtitle. Empty when no folder is chosen.
     var vaultName: String {
         vaultPath.isEmpty ? "" : URL(fileURLWithPath: vaultPath).lastPathComponent
     }

@@ -1,16 +1,12 @@
 import RhyoliteCore
 import SwiftUI
 
-/// The Server tab: the vault's name, the Server switch with the server's status, and the LAN access switch.
+/// The Server tab: the Server switch with the server's status, and the LAN access switch.
 struct ServerTab: View {
     let model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(model.vaultName.isEmpty ? "No vault" : model.vaultName)
-                .font(.largeTitle)
-                .lineLimit(1)
-                .truncationMode(.middle)
             Form {
                 Section {
                     Toggle("Server", isOn: serverBinding)
