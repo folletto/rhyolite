@@ -98,7 +98,7 @@ make test                     # gofmt, vet, cross-compile check, tests with -rac
 make cover                    # + coverage
 make fuzz                     # + 30s fuzzing of path validation
 make app                      # bin/Rhyolite.app (macOS only)
-make release                  # dist/ binaries for macOS, Linux, Windows (CGO-free), plus Rhyolite-macos.zip on macOS
+make release                  # dist/ binaries for macOS, Linux, Windows (CGO-free), plus Rhyolite-macos.dmg on macOS
 ```
 
 `make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).

@@ -1,8 +1,6 @@
 # Settings for .github/workflows/build-macos.yaml (see its header comment).
 
 build-info-plist: macos/Info.plist
-# scripts/build.sh writes VERSION into the bundled Info.plist and the CLI's
-# --version, so pass it the version the workflow just set in macos/Info.plist.
-build-command: VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' macos/Info.plist)" make app
+build-command: make app
 build-output: bin/Rhyolite.app
-build-package: zip
+build-package: dmg

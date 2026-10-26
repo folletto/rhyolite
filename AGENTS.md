@@ -10,7 +10,7 @@ make test      # gofmt + vet + cross-compile + tests with -race, + `swift test` 
 make cover     # + coverage
 make fuzz      # + 30s fuzzing of path validation
 make app       # -> bin/Rhyolite.app (macOS only; needs the Swift toolchain)
-make release   # dist/ for macOS/Linux/Windows (+ Rhyolite-macos.zip on macOS)
+make release   # dist/ for macOS/Linux/Windows (+ Rhyolite-macos.dmg on macOS)
 ```
 
 `make` wraps `scripts/build.sh` and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N] [--access lan|local] [--verbosity none|basic|verbose]`.

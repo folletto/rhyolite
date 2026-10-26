@@ -3,11 +3,18 @@
 #   scripts/build.sh          -> bin/rhyolite for this machine
 #   scripts/build.sh --app    -> bin/Rhyolite.app (macOS only; embeds the CLI)
 #   scripts/build.sh --all    -> dist/rhyolite-<os>-<arch>[.exe] for all supported platforms,
-#                                plus dist/Rhyolite-macos.zip when run on macOS
+#                                plus dist/Rhyolite-macos.dmg when run on macOS
+# The version comes from macos/Info.plist (CFBundleShortVersionString), the
+# single source of truth; the release workflow updates it there.
 set -eu
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
+# plist_string <key>: the <string> value that follows <key> in macos/Info.plist.
+plist_string() {
+	sed -n "/<key>$1<\/key>/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}" macos/Info.plist
+}
+
+VERSION="$(plist_string CFBundleShortVersionString)"
 LDFLAGS="-s -w -X main.version=${VERSION}"
 export CGO_ENABLED=0
 
@@ -40,13 +47,8 @@ build_app() {
 	bin_path="$(swift build -c release --package-path macos --arch arm64 --arch x86_64 --show-bin-path)"
 	cp "$bin_path/Rhyolite" "$app/Contents/MacOS/Rhyolite"
 
-	# Bundle metadata. CFBundleShortVersionString must be numeric; the full
-	# version (e.g. 1a2b3c4-dirty) goes in CFBundleVersion.
-	plist="$app/Contents/Info.plist"
-	cp macos/Info.plist "$plist"
-	short="$(printf '%s' "$VERSION" | sed -nE 's/^v?([0-9]+(\.[0-9]+)+)(-.*)?$/\1/p')"
-	plutil -replace CFBundleShortVersionString -string "${short:-0.0.0}" "$plist"
-	plutil -replace CFBundleVersion -string "$VERSION" "$plist"
+	# Bundle metadata, copied as-is: version and build number live in macos/Info.plist.
+	cp macos/Info.plist "$app/Contents/Info.plist"
 	if [ -f macos/Resources/AppIcon.icns ]; then
 		# -X drops extended attributes (Finder info, resource fork), which codesign rejects.
 		cp -X macos/Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
@@ -63,7 +65,7 @@ build_app() {
 	rm -rf "$out/Rhyolite.app"
 	mv "$app" "$out/Rhyolite.app"
 	rm -rf "$stage"
-	echo "built $out/Rhyolite.app ($VERSION)"
+	echo "built $out/Rhyolite.app ($VERSION, build $(plist_string CFBundleVersion))"
 }
 
 case "${1:-}" in
@@ -90,9 +92,9 @@ case "${1:-}" in
 	build windows arm64 dist/rhyolite-windows-arm64.exe
 	if can_build_app; then
 		build_app dist
-		ditto -c -k --keepParent --norsrc --noextattr --noqtn dist/Rhyolite.app dist/Rhyolite-macos.zip
+		hdiutil create -quiet -volname Rhyolite -srcfolder dist/Rhyolite.app -ov -format UDZO dist/Rhyolite-macos.dmg
 		rm -rf dist/Rhyolite.app
-		echo "built dist/Rhyolite-macos.zip"
+		echo "built dist/Rhyolite-macos.dmg"
 	else
 		echo "skipping the macOS app (needs macOS with the Swift toolchain)"
 	fi
