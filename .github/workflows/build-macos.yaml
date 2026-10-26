@@ -33,6 +33,9 @@
 #   build-package     (optional) zip, dmg, or both as a comma separated list in any
 #                     order (zip,dmg or dmg,zip). Defaults to dmg.
 #
+# If the repository has a go.mod, Go is installed first (actions/setup-go, at the
+# version go.mod declares), so build-command can build Go code.
+#
 # The build number (CFBundleVersion) is set automatically to a UTC timestamp in
 # the format YYYYMMDDHHMM. If the build leaves the app unsigned, it is ad-hoc
 # signed, users will see a Gatekeeper warning on first launch, and the release
@@ -118,6 +121,12 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Set up Go
+        if: hashFiles('go.mod') != ''
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
 
       - name: 1. Read config
         id: config
