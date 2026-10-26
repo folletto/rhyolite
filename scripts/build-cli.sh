@@ -8,6 +8,10 @@
 # stamps from git: the tag on the commit, or a pseudo-version naming it.
 set -eu
 cd "$(dirname "$0")/.."
+if ! command -v go >/dev/null 2>&1; then
+	echo "building the CLI needs Go (https://go.dev/dl/)" >&2
+	exit 1
+fi
 
 LDFLAGS="-s -w"
 if [ -n "${VERSION:-}" ]; then
