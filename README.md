@@ -22,7 +22,7 @@ No tracking, no analytics. It's all in your control.
 ## Quick start
 
 ```sh
-make build                    # -> bin/rhyolite
+make build-cli                # -> bin/rhyolite
 bin/rhyolite ~/Notes          # serve ~/Notes (default: the current folder)
 ```
 
@@ -75,7 +75,7 @@ Security note: the server speaks plain HTTP, so on an untrusted network the bear
 `Rhyolite.app` is a native wrapper around the CLI for people who'd rather not use a terminal. It embeds `rhyolite` and runs it; the server itself is unchanged.
 
 ```sh
-make app                      # -> bin/Rhyolite.app (macOS 14+, needs Xcode or the Command Line Tools)
+make build-app                # -> bin/Rhyolite.app (macOS 14+, needs Xcode or the Command Line Tools)
 open bin/Rhyolite.app
 ```
 
@@ -93,17 +93,18 @@ The build is ad-hoc signed, which is enough on the Mac that built it. An app dow
 ## Develop
 
 ```sh
-make build                    # -> bin/rhyolite
+make build                    # build-cli, then build-app on macOS with Swift
+make build-cli                # -> bin/rhyolite
 make test                     # gofmt, vet, cross-compile check, tests with -race (+ the app's Swift tests on macOS)
 make cover                    # + coverage
 make fuzz                     # + 30s fuzzing of path validation
-make app                      # bin/Rhyolite.app (macOS only)
+make build-app                # -> bin/Rhyolite.app (macOS only)
 make release                  # dist/ binaries for macOS, Linux, Windows (CGO-free), plus Rhyolite-macos.dmg on macOS
 ```
 
 `make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).
 
-The CLI's `--version` is `VERSION` when set (e.g. `VERSION=1.2.3 make build`), otherwise the version Go stamps from git: the tag on the commit, or a pseudo-version naming it. The CLI builds with Go alone; the app (`scripts/build-app.sh`) takes its version and build number from `macos/Info.plist`, which the release workflow updates, and embeds a CLI with the same version.
+The CLI's `--version` is `VERSION` when set (e.g. `VERSION=1.2.3 make build-cli`), otherwise the version Go stamps from git: the tag on the commit, or a pseudo-version naming it. The CLI builds with Go alone; the app (`scripts/build-app.sh`) takes its version and build number from `macos/Info.plist`, which the release workflow updates, and embeds a CLI with the same version.
 
 Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`) and every line is also printed to the terminal; the token and file contents are never logged.
 

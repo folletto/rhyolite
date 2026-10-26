@@ -1,9 +1,9 @@
 #!/bin/sh
 # Build the rhyolite CLI. Needs only Go (and git, for the version); it never
 # depends on the macOS app or its files.
-#   scripts/build.sh                       -> bin/rhyolite for this machine
-#   scripts/build.sh --all                 -> dist/rhyolite-<os>-<arch>[.exe] for all supported platforms
-#   scripts/build.sh --target OS ARCH OUT  -> one binary for OS/ARCH at OUT
+#   scripts/build-cli.sh                      -> bin/rhyolite for this machine
+#   scripts/build-cli.sh --all                -> dist/rhyolite-<os>-<arch>[.exe] for all supported platforms
+#   scripts/build-cli.sh --target OS ARCH OUT -> one binary for OS/ARCH at OUT
 # The version is VERSION when set (e.g. VERSION=1.2.3), otherwise the one Go
 # stamps from git: the tag on the commit, or a pseudo-version naming it.
 set -eu

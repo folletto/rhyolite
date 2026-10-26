@@ -5,15 +5,16 @@ Rhyolite: single-binary Go MCP server (HTTP, bearer token) exposing a folder of 
 ## Commands
 
 ```sh
-make build     # -> bin/rhyolite
+make build     # build-cli, then build-app where it can (macOS with Swift)
+make build-cli # -> bin/rhyolite
 make test      # gofmt + vet + cross-compile + tests with -race, + `swift test` on macOS (run before committing)
 make cover     # + coverage
 make fuzz      # + 30s fuzzing of path validation
-make app       # -> bin/Rhyolite.app (macOS only; needs the Swift toolchain)
+make build-app # -> bin/Rhyolite.app (macOS only; needs the Swift toolchain)
 make release   # dist/ for macOS/Linux/Windows (+ Rhyolite-macos.dmg on macOS)
 ```
 
-`make` wraps `scripts/build.sh` (CLI), `scripts/build-app.sh` (macOS app) and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N] [--access lan|local] [--verbosity none|basic|verbose]`.
+`make` wraps `scripts/build-cli.sh` (CLI), `scripts/build-app.sh` (macOS app) and `scripts/test.sh`, which take extra flags (e.g. `--real-trash` hits the real OS trash). Run locally: `bin/rhyolite <folder> [--port N] [--access lan|local] [--verbosity none|basic|verbose]`.
 
 ## Layout
 
@@ -51,7 +52,7 @@ Implementation commits go on top of that first commit.
 - Add tests alongside changes (`*_test.go`, integration tests in `internal/server`). Keep the fuzz test for path validation passing.
 - Go files must not reference plan files (`specs/`); keep comments self-contained.
 - Update `README.md` (user-facing) when behaviour changes, and the PR's plan in `specs/` if it has one.
-- The CLI and macOS build paths stay isolated. The CLI build (`scripts/build.sh`, `make build`, the CLI part of `make release`, `make test`'s Go checks) needs only Go and git, and never reads anything under `macos/` or calls `scripts/build-app.sh`: deleting `macos/` and `scripts/build-app.sh` must leave it working. The app build (`scripts/build-app.sh`) may call `scripts/build.sh`, never the other way round. The CLI version is `VERSION` when set, otherwise the one Go stamps from git; it is never read from `macos/Info.plist`.
+- The CLI and macOS build paths stay isolated. The CLI build (`scripts/build-cli.sh`, `make build-cli`, the CLI part of `make release`, `make test`'s Go checks) needs only Go and git, and never reads anything under `macos/` or calls `scripts/build-app.sh`: deleting `macos/` and `scripts/build-app.sh` must leave it working. The app build (`scripts/build-app.sh`) may call `scripts/build-cli.sh`, never the other way round. The CLI version is `VERSION` when set, otherwise the one Go stamps from git; it is never read from `macos/Info.plist`.
 - The macOS app only wraps the CLI: it starts and stops it and shows its output. Never move server logic into Swift, and keep the CLI's stdout/stderr and SIGINT/SIGTERM behaviour stable, because the app relies on them (`● Listening` marks a successful start). The app runs the CLI at the default `--verbosity verbose`, so its output view shows the setup lines plus the logfmt `event=` log lines; never make it pass `--verbosity none`, which suppresses `● Listening` so a start is never detected (`basic` is safe).
 - Swift builds only on macOS. Run swift commands outside restrictive sandboxes (they write to system caches).
 - Not implemented yet: TLS (plain HTTP only).

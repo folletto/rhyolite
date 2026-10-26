@@ -1,6 +1,6 @@
 # Settings for .github/workflows/build-macos.yaml (see its header comment).
 
 build-info-plist: macos/Info.plist
-build-command: make app
+build-command: make build-app
 build-output: bin/Rhyolite.app
 build-package: dmg

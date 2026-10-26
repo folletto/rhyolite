@@ -3,8 +3,8 @@
 #   scripts/build-app.sh        -> bin/Rhyolite.app
 #   scripts/build-app.sh --dmg  -> dist/Rhyolite-macos.dmg
 # The app's version and build number are the ones in macos/Info.plist, copied
-# as-is. The embedded CLI is built by scripts/build.sh with that same version,
-# unless VERSION is set. scripts/build.sh never depends on this script.
+# as-is. The embedded CLI is built by scripts/build-cli.sh with that same version,
+# unless VERSION is set. scripts/build-cli.sh never depends on this script.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -28,8 +28,8 @@ build_app() {
 	mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources"
 
 	# Universal CLI, embedded as-is.
-	scripts/build.sh --target darwin arm64 "$stage/rhyolite-arm64"
-	scripts/build.sh --target darwin amd64 "$stage/rhyolite-amd64"
+	scripts/build-cli.sh --target darwin arm64 "$stage/rhyolite-arm64"
+	scripts/build-cli.sh --target darwin amd64 "$stage/rhyolite-amd64"
 	lipo -create -output "$app/Contents/Helpers/rhyolite" "$stage/rhyolite-arm64" "$stage/rhyolite-amd64"
 
 	# Universal app executable.
