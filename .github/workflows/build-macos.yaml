@@ -36,6 +36,11 @@
 # If the repository has a go.mod, Go is installed first (actions/setup-go, at the
 # version go.mod declares), so build-command can build Go code.
 #
+# The version commit and the tag are pushed over SSH with the DEPLOY_KEY secret: a
+# deploy key with write access, so the push can bypass branch protection (add the
+# key as a bypass actor in the ruleset protecting the branch). github.token is
+# still used for the release itself.
+#
 # The build number (CFBundleVersion) is set automatically to a UTC timestamp in
 # the format YYYYMMDDHHMM. If the build leaves the app unsigned, it is ad-hoc
 # signed, users will see a Gatekeeper warning on first launch, and the release
@@ -121,6 +126,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
 
       - name: Set up Go
         if: hashFiles('go.mod') != ''
