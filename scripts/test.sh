@@ -39,7 +39,7 @@ else
 fi
 
 # The macOS app's tests need macOS and the Swift toolchain; elsewhere they are skipped.
-if [ "$(uname -s)" = Darwin ] && command -v swift >/dev/null 2>&1; then
+if [ -d macos ] && [ "$(uname -s)" = Darwin ] && command -v swift >/dev/null 2>&1; then
 	swift test --package-path macos
 else
 	echo "skipping macOS app tests (needs macOS with the Swift toolchain)"

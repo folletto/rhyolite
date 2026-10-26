@@ -88,7 +88,7 @@ open bin/Rhyolite.app
   - **Log**: a live log of the CLI's output, including the `mcp.json` snippets with your token. It follows new output while scrolled to the end and stays put when you scroll up. The log is kept in memory only; **Copy Log** copies it.
 - Closing the window keeps the app and server running. Click the Dock icon to reopen it. **Quit** (menu or ⌘Q) stops the server first: it sends the CLI the same signal as Ctrl+C and only forces it after a timeout.
 
-The build is ad-hoc signed, which is enough on the Mac that built it. An app downloaded from elsewhere is quarantined by Gatekeeper: right-click → Open, or run `xattr -dr com.apple.quarantine Rhyolite.app`. Developer ID signing and notarization aren't set up yet (`SIGN_IDENTITY` in `scripts/build.sh` is the hook for it).
+The build is ad-hoc signed, which is enough on the Mac that built it. An app downloaded from elsewhere is quarantined by Gatekeeper: right-click → Open, or run `xattr -dr com.apple.quarantine Rhyolite.app`. Developer ID signing and notarization aren't set up yet (`SIGN_IDENTITY` in `scripts/build-app.sh` is the hook for it).
 
 ## Develop
 
@@ -102,6 +102,8 @@ make release                  # dist/ binaries for macOS, Linux, Windows (CGO-fr
 ```
 
 `make` wraps the scripts in `scripts/`, which take extra flags (e.g. `scripts/test.sh --real-trash` also tests against the real OS trash).
+
+The CLI's `--version` is `VERSION` when set (e.g. `VERSION=1.2.3 make build`), otherwise the version Go stamps from git: the tag on the commit, or a pseudo-version naming it. The CLI builds with Go alone; the app (`scripts/build-app.sh`) takes its version and build number from `macos/Info.plist`, which the release workflow updates, and embeds a CLI with the same version.
 
 Logs go to `rhyolite.log` in the vault (rolled monthly to `rhyolite.YYYYMM.log`) and every line is also printed to the terminal; the token and file contents are never logged.
 
