@@ -22,9 +22,6 @@ import (
 	"github.com/folletto/rhyolite/internal/vault"
 )
 
-// Set at build time: -ldflags "-X main.version=..."
-var version = "dev"
-
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -55,7 +52,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	if *showVersion {
-		fmt.Fprintln(stdout, "rhyolite", version)
+		fmt.Fprintln(stdout, "rhyolite", resolveVersion())
 		return nil
 	}
 	switch *verbosity {
@@ -129,7 +126,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 			Vault:      v,
 			Token:      cfg.Token,
 			Log:        logw,
-			Version:    version,
+			Version:    resolveVersion(),
 			LocalNames: []string{localName(), cfg.Advertise},
 			LocalOnly:  local,
 		}),
@@ -142,7 +139,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if *verbosity == "verbose" {
 		logw.SetEcho(stdout, "client_new")
 	}
-	logw.Log("start", "version", version, "vault", filepath.Base(dir), "listen", ln.Addr(), "access", cfg.Access)
+	logw.Log("start", "version", resolveVersion(), "vault", filepath.Base(dir), "listen", ln.Addr(), "access", cfg.Access)
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()

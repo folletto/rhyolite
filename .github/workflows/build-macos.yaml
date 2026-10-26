@@ -1,0 +1,461 @@
+# 🕹️ Build Release: macOS (build-macos)
+#
+# Builds a macOS app and publishes it as a GitHub release. When run, it:
+#   1. reads the settings from .github/build-macos.cfg.yaml;
+#   2. checks the requested version is valid and higher than the one in Info.plist;
+#   3. writes the new version (CFBundleShortVersionString) and a new build number
+#      (CFBundleVersion) into Info.plist;
+#   4. runs the build;
+#   5. ad-hoc signs the app if the build left it unsigned;
+#   6. packages the build output (DMG and/or zip) into a draft release, adding
+#      instructions for opening the app to the notes when it is ad-hoc signed;
+#   7. commits Info.plist as "v<version>" and pushes it to the branch it was run on;
+#   8. tags that commit as v<version> and publishes the release.
+# Nothing is committed or published unless the build and packaging succeed.
+#
+# CONFIGURATION
+#
+# The workflow is generic: everything specific to a repository lives in
+# .github/build-macos.cfg.yaml, for example:
+#
+#   build-info-plist: Resources/Info.plist
+#   build-command: make app
+#   build-output: build/MyApp.app
+#   build-package: dmg,zip
+#
+#   build-info-plist  (required) Path to the Info.plist holding the app version.
+#   build-command     (required) Either a bash script (e.g. build.sh), run with
+#                     bash when the value is an existing file, or a shell command
+#                     (e.g. make app). It runs from the repository root.
+#   build-output      (required) Path to the folder or .app produced by the build,
+#                     to be packaged. The app to sign is build-output itself if it
+#                     is a .app, otherwise the first .app found inside it.
+#   build-package     (optional) zip, dmg, or both as a comma separated list in any
+#                     order (zip,dmg or dmg,zip). Defaults to dmg.
+#
+# The build number (CFBundleVersion) is set automatically to a UTC timestamp in
+# the format YYYYMMDDHHMM. If the build leaves the app unsigned, it is ad-hoc
+# signed, users will see a Gatekeeper warning on first launch, and the release
+# notes end with instructions for allowing the app to run. Developer ID
+# signing and notarization are not done here, unless build-command does them.
+#
+# WARNING: build-info-plist must contain literal version values. If the Info.plist
+# uses build variables such as $(MARKETING_VERSION) or $(CURRENT_PROJECT_VERSION)
+# (common in Xcode projects), or the project generates its Info.plist
+# automatically, this action cannot read or update the version, and the run stops
+# with an error.
+#
+# A summary of the run (versions, config, signing, packages, release, warnings)
+# is written to the job summary, shown on the run page.
+#
+# HOW TO RUN
+#
+# Open the Actions tab, choose "🕹️ Build Release: macOS", click "Run workflow", pick the
+# branch and enter the new version as MAJOR.MINOR.PATCH (e.g. 1.4.83).
+
+name: "🕹️ Build Release: macOS"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New version, as MAJOR.MINOR.PATCH (e.g. 1.4.83)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    env:
+      CFG_FILE: .github/build-macos.cfg.yaml
+      VERSION: ${{ inputs.version }}
+      TAG: v${{ inputs.version }}
+      REPO_NAME: ${{ github.event.repository.name }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Prepare helpers
+        run: |
+          mkdir -p "$RUNNER_TEMP/build-macos/dist"
+          cat > "$RUNNER_TEMP/build-macos/lib.sh" <<'EOF'
+          # Shared by every step. State is kept in files, so the job summary
+          # can report what was reached even when a step fails.
+          set -euo pipefail
+          DIR="$RUNNER_TEMP/build-macos"
+          STATE="$DIR/state"
+          WARNINGS="$DIR/warnings"
+          PACKAGES_LIST="$DIR/packages"
+          DIST="$DIR/dist"
+          touch "$STATE" "$WARNINGS" "$PACKAGES_LIST"
+
+          put() { printf '%s=%s\n' "$1" "$2" >> "$STATE"; }
+          get() { grep "^$1=" "$STATE" | tail -n 1 | cut -d= -f2- || true; }
+          begin() { put STEP "$1"; }
+          warn() { echo "::warning::$1"; printf '%s\n' "$1" >> "$WARNINGS"; }
+          fail() { put ERROR "$1"; echo "::error::$1"; exit 1; }
+
+          drop_draft() {
+            if gh release delete "$TAG" --yes; then
+              put RELEASE_STATE deleted
+            else
+              warn "Could not delete the draft release $TAG: delete it by hand."
+            fi
+          }
+          EOF
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "Checkout"
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: 1. Read config
+        id: config
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "1. Read config"
+
+          [ "$GITHUB_REF_TYPE" = branch ] \
+            || fail "Run this workflow on a branch, not on the $GITHUB_REF_TYPE '$GITHUB_REF_NAME'."
+          put BRANCH "$GITHUB_REF_NAME"
+          put START_SHA "$(git rev-parse HEAD)"
+
+          [ -f "$CFG_FILE" ] || fail "Config file $CFG_FILE not found."
+          command -v yq >/dev/null || brew install yq
+          cfg() { yq -r ".[\"$1\"] // \"\"" "$CFG_FILE"; }
+
+          plist=$(cfg build-info-plist) || fail "Cannot parse $CFG_FILE."
+          command=$(cfg build-command)
+          output=$(cfg build-output)
+          package_raw=$(cfg build-package)
+
+          [ -n "$plist" ] || fail "Missing required key 'build-info-plist' in $CFG_FILE."
+          [ -n "$command" ] || fail "Missing required key 'build-command' in $CFG_FILE."
+          [ -n "$output" ] || fail "Missing required key 'build-output' in $CFG_FILE."
+          [ -f "$plist" ] || fail "build-info-plist '$plist' does not point to an existing file."
+
+          # build-package: case-insensitive, comma separated, whitespace and duplicates ignored.
+          packages=$(printf '%s' "$package_raw" | tr '[:upper:]' '[:lower:]' | tr ',' '\n' \
+            | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | { grep -v '^$' || true; } | sort -u)
+          [ -n "$packages" ] || packages=dmg
+          invalid=$(printf '%s\n' "$packages" | { grep -vxE 'dmg|zip' || true; } | paste -sd, -)
+          [ -z "$invalid" ] \
+            || fail "Invalid build-package value '$invalid'. Accepted values: zip, dmg, or a comma separated list such as zip,dmg."
+          packages=$(printf '%s\n' "$packages" | paste -sd, -)
+
+          put PLIST "$plist"
+          put BUILD_COMMAND "$command"
+          put BUILD_OUTPUT "$output"
+          put PACKAGES "$packages"
+          {
+            echo "build-info-plist=$plist"
+            echo "build-command=$command"
+            echo "build-output=$output"
+            echo "build-package=$packages"
+          } >> "$GITHUB_OUTPUT"
+          echo "Config: plist=$plist, command=$command, output=$output, packages=$packages"
+
+      - name: 2. Validate version
+        env:
+          PLIST: ${{ steps.config.outputs.build-info-plist }}
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "2. Validate version"
+
+          re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          [[ $VERSION =~ $re ]] || fail "Invalid version '$VERSION': use the format MAJOR.MINOR.PATCH, e.g. 1.4.83."
+
+          current=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST" 2>/dev/null) \
+            || fail "Cannot read CFBundleShortVersionString from $PLIST."
+          put PREV_VERSION "$current"
+
+          if [[ $current == *'$('* ]]; then
+            fail "The version in $PLIST is the build variable '$current'. build-info-plist must contain literal version values: versions set through Xcode build settings such as \$(MARKETING_VERSION) or \$(CURRENT_PROJECT_VERSION), or a generated Info.plist, are not supported by this action."
+          fi
+          re_current='^[0-9]+(\.[0-9]+)*$'
+          [[ $current =~ $re_current ]] || fail "The current version '$current' in $PLIST is not numeric."
+
+          # True if version $1 is higher than version $2, comparing each component as a number.
+          newer() {
+            local IFS=.
+            local -a a=($1) b=($2)
+            local i n=${#a[@]} x y
+            [ ${#b[@]} -gt "$n" ] && n=${#b[@]}
+            for ((i = 0; i < n; i++)); do
+              x=$((10#${a[i]:-0})); y=$((10#${b[i]:-0}))
+              ((x > y)) && return 0
+              ((x < y)) && return 1
+            done
+            return 1
+          }
+          newer "$VERSION" "$current" \
+            || fail "The new version $VERSION must be higher than the current version $current."
+
+          ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null \
+            || fail "The tag $TAG already exists."
+          ! gh release view "$TAG" >/dev/null 2>&1 \
+            || fail "A release for $TAG already exists (possibly a draft): delete it or choose another version."
+
+          echo "Version $current -> $VERSION"
+
+      - name: 3. Update Info.plist
+        env:
+          PLIST: ${{ steps.config.outputs.build-info-plist }}
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "3. Update Info.plist"
+
+          build_number=$(date -u +%Y%m%d%H%M)
+          pb=/usr/libexec/PlistBuddy
+          $pb -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
+          $pb -c "Set :CFBundleVersion $build_number" "$PLIST" 2>/dev/null \
+            || $pb -c "Add :CFBundleVersion string $build_number" "$PLIST"
+          put BUILD_NUMBER "$build_number"
+          echo "CFBundleShortVersionString=$VERSION, CFBundleVersion=$build_number"
+
+      - name: 4. Build
+        env:
+          BUILD_COMMAND: ${{ steps.config.outputs.build-command }}
+          BUILD_OUTPUT: ${{ steps.config.outputs.build-output }}
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "4. Build"
+
+          if [ -f "$BUILD_COMMAND" ]; then
+            echo "Running script: bash $BUILD_COMMAND"
+            bash "$BUILD_COMMAND" || fail "The build script '$BUILD_COMMAND' failed (exit $?)."
+          else
+            echo "Running command: $BUILD_COMMAND"
+            bash -c "$BUILD_COMMAND" || fail "The build command '$BUILD_COMMAND' failed (exit $?)."
+          fi
+          [ -e "$BUILD_OUTPUT" ] || fail "The build output '$BUILD_OUTPUT' does not exist after the build."
+
+      - name: 5. Check signing
+        env:
+          BUILD_OUTPUT: ${{ steps.config.outputs.build-output }}
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "5. Check signing"
+
+          out="${BUILD_OUTPUT%/}"
+          if [[ $out == *.app ]] && [ -d "$out" ]; then
+            app="$out"
+          else
+            app=$(find "$out" -type d -name '*.app' -prune 2>/dev/null | sort | head -n 1 || true)
+          fi
+          if [ -z "$app" ]; then
+            put SIGNING "no .app found, signing check skipped"
+            warn "No .app bundle found in '$BUILD_OUTPUT': signing check skipped."
+            exit 0
+          fi
+          put APP_PATH "$app"
+
+          if codesign --verify --deep --strict "$app"; then
+            info=$(codesign -dv "$app" 2>&1 || true)
+            if grep -q '^Signature=adhoc' <<<"$info"; then
+              signer="ad-hoc"
+            else
+              signer=$(grep -m 1 '^Authority=' <<<"$info" | cut -d= -f2- || true)
+            fi
+            echo "$app is already signed by the build: ${signer:-unknown identity}"
+            put SIGNING "already signed by the build (${signer:-unknown identity})"
+            if [ "$signer" = ad-hoc ]; then put ADHOC true; fi
+          else
+            echo "$app is unsigned or its signature is invalid: ad-hoc signing it."
+            codesign --force --deep --sign - "$app"
+            codesign --verify --deep --strict "$app" || fail "$app failed signature verification after ad-hoc signing."
+            put SIGNING "ad-hoc signed by this workflow"
+            put ADHOC true
+            warn "The app was ad-hoc signed: users will see a Gatekeeper warning on first launch."
+          fi
+
+      - name: 6. Package and create draft release
+        env:
+          BUILD_OUTPUT: ${{ steps.config.outputs.build-output }}
+          PACKAGES: ${{ steps.config.outputs.build-package }}
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "6. Package and create draft release"
+
+          out="${BUILD_OUTPUT%/}"
+          for format in ${PACKAGES//,/ }; do
+            file="$DIST/$REPO_NAME-$VERSION.$format"
+            case $format in
+              dmg)
+                # hdiutil occasionally fails with "Resource busy" on hosted runners.
+                ok=false
+                for attempt in 1 2 3; do
+                  if hdiutil create -volname "$REPO_NAME" -srcfolder "$out" -ov -format UDZO "$file"; then
+                    ok=true; break
+                  fi
+                  echo "hdiutil failed (attempt $attempt), retrying..."; sleep 5
+                done
+                $ok || fail "Could not create the DMG $(basename "$file")."
+                ;;
+              zip)
+                ditto -c -k --keepParent "$out" "$file" || fail "Could not create the zip $(basename "$file")."
+                ;;
+            esac
+            printf '%s\t%s\t%s\n' "$(basename "$file")" "$format" "$(stat -f %z "$file")" >> "$PACKAGES_LIST"
+          done
+
+          notes="$DIR/notes.md"
+          gh api "repos/$GH_REPO/releases/generate-notes" -f tag_name="$TAG" -f target_commitish="$(get START_SHA)" \
+            -q .body > "$notes" || fail "Could not generate the release notes for $TAG."
+          if [ "$(get ADHOC)" = true ]; then
+            cat >> "$notes" <<'NOTES'
+
+          ---
+
+          **Opening the app:** this build is ad-hoc signed, so macOS blocks it the first time it is opened. To run it, open the app once, then go to **System Settings → Privacy & Security → Security** and click **Allow**.
+          NOTES
+          fi
+
+          put RELEASE_STATE creating
+          gh release create "$TAG" --draft --title "$TAG" --target "$(get START_SHA)" --notes-file "$notes" "$DIST"/* \
+            || fail "Could not create the draft release $TAG."
+          put RELEASE_STATE draft
+          put RELEASE_URL "$(gh release view "$TAG" --json url -q .url || true)"
+
+      - name: 7. Check the branch, commit and push
+        env:
+          PLIST: ${{ steps.config.outputs.build-info-plist }}
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "7. Check the branch, commit and push"
+
+          branch=$(get BRANCH)
+          start_sha=$(get START_SHA)
+          git fetch --quiet origin "refs/heads/$branch"
+          remote_sha=$(git rev-parse FETCH_HEAD)
+          if [ "$remote_sha" != "$start_sha" ]; then
+            drop_draft
+            fail "The branch $branch moved on during the run ($start_sha -> $remote_sha). Nothing was committed or published: run the workflow again."
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet -m "$TAG" -- "$PLIST"
+          if ! git push origin "HEAD:refs/heads/$branch"; then
+            drop_draft
+            fail "Pushing the version commit to $branch was rejected. Nothing was published: run the workflow again."
+          fi
+          put VERSION_SHA "$(git rev-parse HEAD)"
+
+      - name: 8. Tag and publish
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          begin "8. Tag and publish"
+
+          sha=$(get VERSION_SHA)
+          branch=$(get BRANCH)
+          git tag "$TAG" "$sha" && git push origin "refs/tags/$TAG" \
+            || fail "The version commit $sha is pushed to $branch, but tagging failed. To finish by hand: push the tag $TAG on $sha, then publish the draft release $TAG."
+          gh release edit "$TAG" --tag "$TAG" --draft=false \
+            || fail "The version commit and the tag $TAG are pushed, but publishing failed. To finish by hand: publish the draft release $TAG on GitHub."
+          put RELEASE_STATE published
+          put RELEASE_URL "$(gh release view "$TAG" --json url -q .url || true)"
+
+      - name: Delete draft release on failure
+        if: failure()
+        run: |
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+          # Once the version commit is pushed, the draft is kept so it can be published by hand.
+          case "$(get RELEASE_STATE)" in
+            creating | draft)
+              [ -z "$(get VERSION_SHA)" ] && gh release view "$TAG" >/dev/null 2>&1 && drop_draft
+              ;;
+          esac
+          true
+
+      - name: Job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ ! -f "$RUNNER_TEMP/build-macos/lib.sh" ]; then
+            echo "## 🕹️ Build Release: macOS: failed before the run started" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          source "$RUNNER_TEMP/build-macos/lib.sh"
+
+          human_size() {
+            awk -v b="$1" 'BEGIN { split("B KB MB GB", u, " "); i = 1
+              while (b >= 1024 && i < 4) { b /= 1024; i++ }
+              printf (i == 1 ? "%d %s" : "%.1f %s"), b, u[i] }'
+          }
+          or_dash() { if [ -n "$1" ]; then printf '%s' "$1"; else printf '—'; fi; }
+          code() { if [ -n "$1" ]; then printf '`%s`' "$1"; else printf '—'; fi; }
+
+          {
+            if [ "$JOB_STATUS" = success ]; then
+              echo "## 🕹️ Build Release: macOS $TAG: ✅ success"
+            else
+              echo "## 🕹️ Build Release: macOS $TAG: ❌ $JOB_STATUS"
+              echo
+              echo "**Failed at:** $(or_dash "$(get STEP)")"
+              echo
+              error=$(get ERROR)
+              echo "**Error:** ${error:-see the step log}"
+            fi
+            echo
+
+            echo "### Version"
+            echo "- Version: $(or_dash "$(get PREV_VERSION)") → $VERSION"
+            echo "- Build number (CFBundleVersion): $(or_dash "$(get BUILD_NUMBER)")"
+            echo
+
+            echo "### Branch"
+            echo "- Branch: $(code "$(get BRANCH)")"
+            echo "- Starting commit: $(code "$(get START_SHA)")"
+            echo "- Version commit: $(code "$(get VERSION_SHA)")"
+            echo
+
+            echo "### Config"
+            echo "- build-info-plist: $(code "$(get PLIST)")"
+            echo "- build-command: $(code "$(get BUILD_COMMAND)")"
+            echo "- build-output: $(code "$(get BUILD_OUTPUT)")"
+            echo "- build-package: $(code "$(get PACKAGES)")"
+            echo
+
+            echo "### Signing"
+            echo "- App: $(code "$(get APP_PATH)")"
+            echo "- Signing: $(or_dash "$(get SIGNING)")"
+            echo
+
+            echo "### Packages"
+            if [ -s "$PACKAGES_LIST" ]; then
+              echo "| File | Format | Size |"
+              echo "| --- | --- | --- |"
+              while IFS=$'\t' read -r name format size; do
+                echo "| $name | $format | $(human_size "$size") |"
+              done < "$PACKAGES_LIST"
+            else
+              echo "None built."
+            fi
+            echo
+
+            echo "### Release"
+            url=$(get RELEASE_URL)
+            echo "- Tag: $(code "$TAG")"
+            echo "- Release: $([ -n "$url" ] && echo "[$TAG]($url)" || echo '—')"
+            echo "- State: $(or_dash "$(get RELEASE_STATE)")"
+            echo
+
+            echo "### Warnings"
+            if [ -s "$WARNINGS" ]; then
+              sed 's/^/- /' "$WARNINGS"
+            else
+              echo "None."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
